@@ -207,6 +207,15 @@ footer code{font:500 10.5px var(--mono);color:var(--dim);background:#0d181c;bord
 #toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,16px);opacity:0;z-index:60;pointer-events:none;background:#15262c;border:1px solid var(--line-hi);border-left:3px solid var(--green);border-radius:8px;padding:11px 18px;font:500 13px var(--body);color:var(--ink);box-shadow:0 14px 40px rgba(0,0,0,.5);transition:.3s;max-width:88vw}
 #toast.show{opacity:1;transform:translate(-50%,0)}
 #toast.err{border-left-color:var(--red);color:#ffc4bf}
+.vt-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px}
+.vrow{display:flex;align-items:center;gap:10px;background:rgba(11,21,25,.6);border:1px solid var(--line);border-radius:8px;padding:8px 10px;transition:border-color .2s}
+.vrow.play{border-color:var(--amber)}.vrow.ok{border-color:rgba(65,224,141,.35)}.vrow.err{border-color:rgba(255,95,86,.4)}
+.vrow .vplay{flex:0 0 auto;width:32px;height:32px;border-radius:7px;border:1px solid var(--line);background:#0b1519;color:var(--amber-hi);cursor:pointer;font-size:13px;transition:.2s}
+.vrow .vplay:hover:not(:disabled){border-color:var(--amber);color:var(--amber)}
+.vrow .vplay:disabled{opacity:.35;cursor:not-allowed}
+.vrow .vname{font:700 12px var(--mono);letter-spacing:.06em;color:var(--ink);min-width:62px}
+.vrow .vst{font:600 9px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin-left:auto;white-space:nowrap}
+.vrow.play .vst{color:var(--amber-hi)}.vrow.ok .vst{color:var(--green)}.vrow.err .vst{color:var(--red)}
 @media(max-width:980px){main{grid-template-columns:1fr}.log-grid{grid-template-columns:1fr}.pane+.pane{border-left:none;border-top:1px solid var(--line);max-height:180px}}
 </style>
 </head>
@@ -347,6 +356,23 @@ footer code{font:500 10.5px var(--mono);color:var(--dim);background:#0d181c;bord
         <div class="hint">В авторежиме агент сам слышит конец фразы. Эхо из динамиков может вызывать ложные срабатывания — используй наушники.</div>
       </section>
     </aside>
+
+    <section class="panel pg vaud" style="grid-column:1/-1">
+      <div class="log-head">
+        <h2 style="margin:0">Проба голосов · русский</h2>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <span class="lat" style="border-style:solid">модель: <b id="vt-model">openai/gpt-audio</b> · wav</span>
+          <button class="mini" id="vt-all" type="button">▶ прослушать все</button>
+          <button class="mini" id="vt-stop" type="button">⏹ стоп</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Тестовая фраза <output id="vt-len"></output></label>
+        <textarea id="vt-text" spellcheck="false" style="min-height:66px">Здравствуйте! Меня зовут Алиса, я голосовой ассистент. Сегодня двадцать четвёртое июля, на улице плюс двадцать три градуса. Чем могу помочь?</textarea>
+      </div>
+      <div class="hint" style="margin-bottom:12px">Одна и та же фраза озвучивается всеми голосами на выбранной модели. Результат кэшируется — повторное прослушивание бесплатно. Каждый прогон всех голосов расходует аудио-токены (~несколько центов).</div>
+      <div id="vt-list" class="vt-list"></div>
+    </section>
 
     <section class="panel pc logs">
       <div class="log-head">
@@ -871,9 +897,95 @@ function trace(an,buf,color,dir,glow){
   $("vu-out").style.width=Math.min(100,rmsOut*340)+"%";
 })();
 
+/* ── Проба голосов ─────────────────────────────────────────── */
+const VOICES=["alloy","ash","ballad","coral","echo","nova","onyx","sage","shimmer","verse"];
+const vCache={};      /* voice -> blob url (кэш, чтобы не платить за повтор) */
+let vAudio=null,vAbort=false;
+
+function buildVoiceList(){
+  const box=$("vt-list");box.innerHTML="";
+  VOICES.forEach(v=>{
+    const row=document.createElement("div");row.className="vrow";row.dataset.v=v;
+    row.innerHTML='<button class="vplay" type="button" disabled>▶</button><span class="vname">'+v+'</span><span class="vst">—</span>';
+    row.querySelector(".vplay").addEventListener("click",()=>{if(vCache[v])playVoiceUrl(vCache[v],v);});
+    box.appendChild(row);
+  });
+}
+function vRow(v){return $("vt-list").querySelector('.vrow[data-v="'+v+'"]');}
+function setVoice(v,state,label){
+  const r=vRow(v);if(!r)return;
+  r.classList.remove("play","ok","err");if(state==="play"||state==="ok"||state==="err")r.classList.add(state);
+  r.querySelector(".vst").textContent=label;
+  r.querySelector(".vplay").disabled=!vCache[v];
+}
+function playVoiceUrl(url,v){
+  if(vAudio){try{vAudio.pause();}catch(e){}}
+  document.querySelectorAll(".vrow.play").forEach(r=>r.classList.remove("play"));
+  const r=vRow(v);if(r)r.classList.add("play");
+  vAudio=new Audio(url);
+  vAudio.onended=vAudio.onerror=()=>{if(r)r.classList.remove("play");};
+  vAudio.play().catch(()=>{});
+  return new Promise(res=>{vAudio.onended=vAudio.onerror=()=>{if(r)r.classList.remove("play");res();};});
+}
+async function synthVoice(v,text,model){
+  const body={
+    model,modalities:["text","audio"],audio:{voice:v,format:"wav"},
+    messages:[
+      {role:"system",content:"Ты — русский диктор. Произнеси текст пользователя дословно на чистом русском без иностранного акцента. Ничего не добавляй и не комментируй."},
+      {role:"user",content:text}
+    ]
+  };
+  const res=await fetch("https://openrouter.ai/api/v1/chat/completions",{
+    method:"POST",
+    headers:{"Authorization":"Bearer "+els.key.value.trim(),"Content-Type":"application/json","HTTP-Referer":"https://rtpult.local","X-Title":"RT PULT"},
+    body:JSON.stringify(body)
+  });
+  if(!res.ok)throw new Error(explainErr(await res.text()));
+  const data=await res.json();
+  const msg=data.choices&&data.choices[0]&&data.choices[0].message;
+  const audio=msg&&msg.audio;
+  if(!audio||!audio.data)throw new Error("аудио не пришло"+(msg&&msg.content?": "+msg.content.slice(0,80):""));
+  const bytes=b64ToBytes(audio.data);
+  let wavBuf;
+  if(bytes.length>4&&bytes[0]===0x52&&bytes[1]===0x49)wavBuf=bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.length);
+  else wavBuf=wrapWAV(bytes,24000);
+  return URL.createObjectURL(new Blob([wavBuf],{type:"audio/wav"}));
+}
+async function auditionAll(){
+  if(!els.key.value.trim()){toast("Вставь OpenRouter API-ключ",true);return;}
+  const text=$("vt-text").value.trim();
+  if(!text){toast("Введи тестовую фразу",true);return;}
+  const model=els.model.value.trim()||"openai/gpt-audio";
+  $("vt-model").textContent=model;
+  vAbort=false;$("vt-all").disabled=true;
+  hlog("проба голосов · "+model+" · "+VOICES.length+" шт.","wrn");
+  for(const v of VOICES){
+    if(vAbort){setVoice(v,"","отменено");continue;}
+    if(vCache[v]){setVoice(v,"ok","из кэша");await playVoiceUrl(vCache[v],v);if(vAbort)break;continue;}
+    setVoice(v,"","синтез…");
+    try{
+      const url=await synthVoice(v,text,model);
+      vCache[v]=url;setVoice(v,"ok","готово ✓");hlog("голос "+v+" · ok","ok");
+      if(vAbort)break;
+      await playVoiceUrl(url,v);
+    }catch(e){
+      setVoice(v,"err","ошибка");hlog("голос "+v+": "+e.message,"err");
+    }
+  }
+  $("vt-all").disabled=false;
+  if(!vAbort)toast("Проба голосов завершена — жми ▶ у любого, чтобы переслушать");
+}
+buildVoiceList();
+$("vt-all").addEventListener("click",auditionAll);
+$("vt-stop").addEventListener("click",()=>{vAbort=true;if(vAudio){try{vAudio.pause();}catch(e){}}document.querySelectorAll(".vrow.play").forEach(r=>r.classList.remove("play"));toast("Остановлено");});
+$("vt-text").addEventListener("input",()=>{$("vt-len").textContent=$("vt-text").value.length+" симв.";Object.keys(vCache).forEach(k=>{URL.revokeObjectURL(vCache[k]);delete vCache[k];});VOICES.forEach(v=>setVoice(v,"","—"));});
+$("vt-len").textContent=$("vt-text").value.length+" симв.";
+$("vt-model").textContent=(els.model.value.trim()||"openai/gpt-audio");
+els.model.addEventListener("input",()=>{$("vt-model").textContent=(els.model.value.trim()||"openai/gpt-audio");});
+
 load();
 if(!SR)hlog("Web Speech API недоступен — реплики клиента будут без расшифровки","wrn");
-hlog("консоль загружена · build 2026-07-24-accent · прохожу предполётную проверку","ok");
+hlog("консоль загружена · build 2026-07-24-voices · прохожу предполётную проверку","ok");
 checkEnvironment();
 </script>
 </body>

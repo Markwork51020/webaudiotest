@@ -315,6 +315,7 @@ footer code{font:500 10.5px var(--mono);color:var(--dim);background:#0d181c;bord
               <option value="echo">echo</option><option value="shimmer">shimmer</option>
               <option value="onyx">onyx</option><option value="verse">verse</option>
             </select>
+            <div class="hint">Голоса OpenAI — англоязычные, по-русски дают акцент. Промпт с указанием произношения его смягчает. Меньше акцента обычно у <b>coral</b>, <b>sage</b>, <b>shimmer</b> — попробуй несколько.</div>
           </div>
         </div>
       </section>
@@ -399,6 +400,11 @@ orders:`Ты — оператор приёма заказов «ТехноСер
 Сценарий: поздоровайся → спроси номер заказа или телефон → уточни что нужно → подтверди данные вслух → попрощайся.
 
 Правила: не выдумывай статусы; при негативе — извинись и предложи менеджера.`};
+
+/* Указание про произношение — добавляется к системному промпту в каждом запросе.
+   Голоса OpenAI обучены на английском и по-русски звучат с акцентом; модель gpt-audio
+   слушается таких инструкций и заметно смягчает акцент. */
+const VOICE_STYLE=`ПРОИЗНОШЕНИЕ (критично): ты носитель русского языка из Москвы. Говори на чистом литературном русском с правильной русской фонетикой и естественной интонацией. НЕ говори с английским или иностранным акцентом. Русское раскатистое «р», мягкие согласные, полные безударные гласные, ударения по норме русского языка. Английские слова и названия произноси в русской адаптации. Темп — спокойная разговорная русская речь.`;
 
 const S={
   state:"gate",history:[],dialog:[],turns:0,tokIn:0,tokOut:0,cost:0,
@@ -695,7 +701,7 @@ async function sendTurn(rec,userText){
     stream:true,stream_options:{include_usage:true},
     modalities:["text","audio"],
     audio:{voice:els.voice.value,format:"pcm16"},
-    messages:[{role:"system",content:els.prompt.value},...S.history]
+    messages:[{role:"system",content:els.prompt.value+"\n\n"+VOICE_STYLE},...S.history]
   };
   S.controller=new AbortController();
   const aChunks=[];let transcript="",contentText="",usage=null,audioReadyAt=null;
@@ -867,7 +873,7 @@ function trace(an,buf,color,dir,glow){
 
 load();
 if(!SR)hlog("Web Speech API недоступен — реплики клиента будут без расшифровки","wrn");
-hlog("консоль загружена · build 2026-07-24-wav · прохожу предполётную проверку","ok");
+hlog("консоль загружена · build 2026-07-24-accent · прохожу предполётную проверку","ok");
 checkEnvironment();
 </script>
 </body>

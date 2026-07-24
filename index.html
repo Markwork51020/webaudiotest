@@ -686,7 +686,8 @@ async function sendTurn(rec,userText){
   const aChunks=[];let transcript="",contentText="",usage=null,audioReadyAt=null;
   addUserBubble(userText||"(речь без расшифровки)",rec.sec);
   const draft=startAgentBubble();
-  hlog("POST /api/v1/chat/completions · "+body.model+" · аудио "+rec.sec.toFixed(1)+" c","wrn");
+  const wavOk=rec.b64.slice(0,4)==="UklG"; /* base64 от "RIF" — быстрая проверка валидного WAV-заголовка */
+  hlog("POST /api/v1/chat/completions · "+body.model+" · вход "+(wavOk?"wav✓":"НЕ WAV!")+" "+rec.sec.toFixed(1)+" c · выход pcm16","wrn");
   try{
     const res=await fetch("https://openrouter.ai/api/v1/chat/completions",{
       method:"POST",
@@ -851,7 +852,7 @@ function trace(an,buf,color,dir,glow){
 
 load();
 if(!SR)hlog("Web Speech API недоступен — реплики клиента будут без расшифровки","wrn");
-hlog("консоль загружена · прохожу предполётную проверку","ok");
+hlog("консоль загружена · build 2026-07-24-wav · прохожу предполётную проверку","ok");
 checkEnvironment();
 </script>
 </body>

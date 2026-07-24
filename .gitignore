@@ -1,0 +1,6 @@
+# deploy / tooling artifacts
+.vercel/
+.netlify/
+node_modules/
+*.log
+.DS_Store

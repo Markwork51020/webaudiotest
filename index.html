@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RT·ПУЛЬТ · OpenRouter — голосовой агент</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/unbounded/index.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/unbounded/600.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/unbounded/800.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/ibm-plex-sans/index.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/ibm-plex-sans/500.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/ibm-plex-sans/600.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/jetbrains-mono/index.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/jetbrains-mono/700.css">
+<style>
+:root{
+  --line:#1d3038;--line-hi:#2e4a54;
+  --ink:#eae4d5;--dim:#8ea3a5;--faint:#597074;
+  --amber:#ffb454;--amber-hi:#ffd28a;--green:#41e08d;--cyan:#5fd4e4;--red:#ff5f56;
+  --disp:'Unbounded',system-ui,sans-serif;
+  --body:'IBM Plex Sans',system-ui,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:var(--body);color:var(--ink);overflow-x:hidden;
+  background:
+    radial-gradient(950px 520px at 88% -12%,rgba(255,170,60,.09),transparent 62%),
+    radial-gradient(760px 540px at -8% 112%,rgba(65,224,141,.07),transparent 60%),
+    radial-gradient(600px 400px at 50% 120%,rgba(95,212,228,.05),transparent 60%),
+    linear-gradient(180deg,#0d1618,#0a1113 55%,#0c1417);
+}
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:
+    repeating-linear-gradient(0deg,rgba(255,255,255,.016) 0 1px,transparent 1px 46px),
+    repeating-linear-gradient(90deg,rgba(255,255,255,.012) 0 1px,transparent 1px 46px);
+  mask-image:radial-gradient(120% 90% at 50% 30%,#000 40%,transparent 100%);
+}
+body::after{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.5;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .028 0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.scan{position:fixed;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(95,212,228,.4),transparent);opacity:.4;animation:scan 9s linear infinite;pointer-events:none;z-index:1}
+@keyframes scan{from{top:-2%}to{top:102%}}
+
+#gate{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;background:rgba(7,12,14,.9);backdrop-filter:blur(8px);transition:opacity .5s,visibility .5s}
+#gate.hidden{opacity:0;visibility:hidden;pointer-events:none}
+.gate-card{max-width:480px;width:92%;background:linear-gradient(180deg,#132228,#0e181c);border:1px solid var(--line);border-radius:14px;padding:32px 32px 28px;box-shadow:0 30px 90px rgba(0,0,0,.65);position:relative;overflow:hidden;animation:gateIn .55s cubic-bezier(.2,.7,.3,1) both}
+@keyframes gateIn{from{opacity:0;transform:translateY(26px) scale(.97)}to{opacity:1;transform:none}}
+.gate-card::before{content:"";position:absolute;top:-1px;left:50%;transform:translateX(-50%);width:90px;height:2px;background:var(--amber);border-radius:2px}
+.gate-head{display:flex;align-items:center;gap:14px;margin-bottom:24px}
+.gate-mic{width:52px;height:52px;border-radius:12px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;font-size:26px;background:rgba(255,180,84,.08);border:1px solid rgba(255,180,84,.3);animation:micPulse 2.4s ease-in-out infinite}
+@keyframes micPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,180,84,.25)}50%{box-shadow:0 0 0 10px rgba(255,180,84,0)}}
+.gate-head h2{font:800 16px var(--disp);letter-spacing:.06em}
+.gate-head .sub{font:600 9px var(--mono);letter-spacing:.24em;color:var(--faint);text-transform:uppercase;margin-top:5px}
+.checklist{display:flex;flex-direction:column;gap:8px;margin-bottom:22px}
+.ck{display:flex;align-items:center;justify-content:space-between;gap:12px;background:rgba(11,21,25,.6);border:1px solid var(--line);border-radius:8px;padding:10px 14px;transition:border-color .3s,opacity .3s,transform .3s;opacity:0;transform:translateX(-10px)}
+.ck.show{opacity:1;transform:none}
+.ck .lbl{font:500 12px var(--mono);letter-spacing:.06em;color:var(--dim);display:flex;align-items:center;gap:9px}
+.ck .lbl::before{content:"▸";color:var(--faint)}
+.ck .pill{font:700 9px var(--mono);letter-spacing:.14em;text-transform:uppercase;border:1px solid var(--line);border-radius:5px;padding:4px 9px;color:var(--faint);transition:.3s;white-space:nowrap}
+.ck.ok{border-color:rgba(65,224,141,.35)}
+.ck.ok .pill{color:var(--green);border-color:rgba(65,224,141,.4);background:rgba(65,224,141,.07)}
+.ck.ok .lbl::before{content:"✓";color:var(--green)}
+.ck.err{border-color:rgba(255,95,86,.4)}
+.ck.err .pill{color:var(--red);border-color:rgba(255,95,86,.45);background:rgba(255,95,86,.08)}
+.ck.err .lbl::before{content:"✕";color:var(--red)}
+.ck.wait .pill{color:var(--amber-hi);border-color:rgba(255,180,84,.4);background:rgba(255,180,84,.07);animation:blink 1.4s steps(2) infinite}
+.ck.req .pill{color:var(--cyan);border-color:rgba(95,212,228,.4);background:rgba(95,212,228,.07);animation:blink .8s steps(2) infinite}
+@keyframes blink{50%{opacity:.35}}
+#btn-mic{width:100%;font:800 13px var(--disp);letter-spacing:.1em;color:#221503;cursor:pointer;background:linear-gradient(180deg,var(--amber-hi),var(--amber));border:none;border-radius:10px;padding:17px 20px;box-shadow:0 6px 26px rgba(255,180,84,.35);transition:.2s}
+#btn-mic:hover{transform:translateY(-2px);box-shadow:0 10px 34px rgba(255,180,84,.45)}
+#btn-mic:active{transform:translateY(0) scale(.98)}
+#btn-mic.ok{background:linear-gradient(180deg,#5df0a5,var(--green));color:#03210f;box-shadow:0 6px 26px rgba(65,224,141,.35)}
+.gate-status{margin-top:15px;font:600 10.5px var(--mono);letter-spacing:.12em;text-align:center;min-height:16px;transition:.2s}
+.gate-status.wait{color:var(--faint)}.gate-status.req{color:var(--cyan)}.gate-status.ok{color:var(--green)}.gate-status.err{color:var(--red)}
+.gate-meter{height:7px;border-radius:4px;background:#16262b;border:1px solid var(--line);margin-top:14px;overflow:hidden;display:none}
+.gate-meter.show{display:block}
+.gate-meter i{display:block;height:100%;width:0%;background:linear-gradient(90deg,var(--cyan),var(--green));border-radius:4px;transition:width .09s linear}
+.gate-meter-lbl{font:600 8.5px var(--mono);letter-spacing:.2em;color:var(--faint);text-transform:uppercase;margin-top:6px;text-align:center;display:none}
+.gate-meter-lbl.show{display:block}
+.gate-warn{margin-top:14px;font:400 11.5px/1.6 var(--body);color:var(--amber-hi);background:rgba(255,180,84,.07);border:1px solid rgba(255,180,84,.22);border-radius:8px;padding:10px 14px;display:none}
+.gate-warn.show{display:block}
+.gate-warn code{font:600 10.5px var(--mono);background:rgba(255,180,84,.14);border-radius:4px;padding:2px 6px}
+.gate-err{margin-top:14px;font:400 12px/1.65 var(--body);color:#ffb3ae;background:rgba(255,95,86,.08);border:1px solid rgba(255,95,86,.28);border-radius:8px;padding:12px 14px;display:none}
+.gate-err.show{display:block;animation:gateIn .3s ease both}
+.gate-err b{color:#ffd0cc}
+
+.wrap{position:relative;z-index:2;max-width:1240px;margin:0 auto;padding:22px 22px 40px;opacity:.3;pointer-events:none;transition:opacity .6s}
+.wrap.active{opacity:1;pointer-events:auto}
+header{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:20px}
+.brand{display:flex;align-items:center;gap:12px}
+.brand .dot{width:10px;height:10px;border-radius:50%;background:#3a4a44;transition:.3s}
+.brand .dot.live{background:var(--green);box-shadow:0 0 12px rgba(65,224,141,.9);animation:blink 1.6s steps(2) infinite}
+.brand h1{font:800 15px/1 var(--disp);letter-spacing:.12em}
+.brand h1 b{color:var(--amber)}
+.brand em{display:block;font:500 9.5px var(--mono);letter-spacing:.22em;color:var(--faint);text-transform:uppercase;margin-top:5px;font-style:normal}
+.meters{display:flex;gap:8px;flex-wrap:wrap}
+.chip{font:500 11.5px var(--mono);color:var(--dim);border:1px solid var(--line);background:rgba(13,23,27,.7);padding:7px 11px;border-radius:6px;display:flex;gap:7px;align-items:center;transition:border-color .2s}
+.chip:hover{border-color:var(--line-hi)}
+.chip b{color:var(--ink)}.chip .ca{color:var(--amber-hi)}.chip .cg{color:var(--green)}.chip .cc{color:var(--cyan)}
+.mic-chip{cursor:pointer}
+.mic-chip .mdot{width:8px;height:8px;border-radius:50%;background:#3a4a44;transition:.3s}
+.mic-chip .mdot.on{background:var(--green);box-shadow:0 0 8px rgba(65,224,141,.8)}
+main{display:grid;grid-template-columns:1.16fr .84fr;gap:16px}
+.panel{position:relative;background:linear-gradient(180deg,#122025,#0e181c);border:1px solid var(--line);border-radius:10px;padding:18px;box-shadow:inset 0 1px 0 rgba(255,255,255,.035),0 14px 40px rgba(0,0,0,.35);animation:rise .55s cubic-bezier(.2,.7,.3,1) both}
+.panel::before{content:"";position:absolute;top:-1px;left:16px;width:46px;height:2px;border-radius:2px;background:var(--amber)}
+.panel.pg::before{background:var(--green)}.panel.pc::before{background:var(--cyan)}
+.rack{display:flex;flex-direction:column;gap:16px}
+.rack .panel:nth-child(1){animation-delay:.06s}.rack .panel:nth-child(2){animation-delay:.12s}.rack .panel:nth-child(3){animation-delay:.18s}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+h2{font:700 10.5px var(--mono);letter-spacing:.22em;text-transform:uppercase;color:var(--dim);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+h2::before{content:"—";color:var(--amber)}
+.statusline{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:12px}
+#big-status{font:800 clamp(22px,3.2vw,38px)/1.1 var(--disp);letter-spacing:.02em;color:#4d6a63;transition:color .3s,text-shadow .3s}
+#big-status.rec{color:var(--red);text-shadow:0 0 26px rgba(255,95,86,.4)}
+#big-status.think{color:var(--cyan);text-shadow:0 0 26px rgba(95,212,228,.3)}
+#big-status.speak{color:var(--amber-hi);text-shadow:0 0 26px rgba(255,180,84,.35)}
+#big-status.auto{color:var(--green);text-shadow:0 0 26px rgba(65,224,141,.3)}
+.dots span{animation:dotp 1.2s infinite;display:inline-block}
+.dots span:nth-child(2){animation-delay:.2s}.dots span:nth-child(3){animation-delay:.4s}
+@keyframes dotp{0%,60%,100%{opacity:.2}30%{opacity:1}}
+.lamps{display:flex;gap:14px}
+.lamp-item{display:flex;align-items:center;gap:6px;font:600 9.5px var(--mono);letter-spacing:.18em;color:var(--faint)}
+.lamp-item i{width:9px;height:9px;border-radius:50%;background:#20333a;transition:.2s}
+.lamp-item i.r.on{background:var(--red);box-shadow:0 0 10px rgba(255,95,86,.9);animation:blink 1s steps(2) infinite}
+.lamp-item i.g.on{background:var(--green);box-shadow:0 0 10px rgba(65,224,141,.85)}
+.lamp-item i.a.on{background:var(--amber);box-shadow:0 0 10px rgba(255,180,84,.85)}
+.lat-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.lat{font:600 10.5px var(--mono);letter-spacing:.08em;color:var(--faint);border:1px dashed var(--line);border-radius:6px;padding:6px 10px}
+.lat b{color:var(--amber-hi)}
+.scope-box{border:1px solid var(--line);border-radius:8px;background:linear-gradient(180deg,#0a1316,#0c161a);overflow:hidden;position:relative}
+.scope-box .tag{position:absolute;top:8px;left:10px;font:600 9px var(--mono);letter-spacing:.2em;color:var(--faint);z-index:2;text-transform:uppercase}
+canvas#scope{display:block;width:100%;height:170px}
+.vu-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+.vu label{font:600 9px var(--mono);letter-spacing:.2em;color:var(--faint)}
+.vu-bar{height:7px;border-radius:4px;background:#132329;border:1px solid var(--line);margin-top:5px;overflow:hidden}
+.vu-bar i{display:block;height:100%;width:0%;border-radius:4px;transition:width .09s linear}
+#vu-in{background:linear-gradient(90deg,#1f7f68,var(--cyan))}
+#vu-out{background:linear-gradient(90deg,#8a5a1f,var(--amber))}
+.ctrl{display:flex;align-items:center;justify-content:center;gap:22px;margin-top:22px;flex-wrap:wrap}
+.ptt{position:relative;min-width:250px;padding:24px 36px;border-radius:14px;cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:none;font:800 14px var(--disp);letter-spacing:.12em;color:var(--amber-hi);text-align:center;background:repeating-linear-gradient(90deg,rgba(255,180,84,.05) 0 6px,transparent 6px 12px),linear-gradient(180deg,#1b2a22,#12201a);border:1.5px solid rgba(255,180,84,.5);box-shadow:0 6px 0 #0a1410,0 12px 30px rgba(0,0,0,.4);transition:transform .07s,box-shadow .07s,border-color .2s,color .2s}
+.ptt small{display:block;font:600 9.5px var(--mono);letter-spacing:.2em;color:var(--faint);margin-top:7px}
+.ptt:hover:not(:disabled){border-color:var(--amber)}
+.ptt.hold{transform:translateY(5px);box-shadow:0 1px 0 #0a1410,0 0 34px rgba(255,95,86,.35);color:#ffc9c5;border-color:rgba(255,95,86,.75);background:repeating-linear-gradient(90deg,rgba(255,95,86,.07) 0 6px,transparent 6px 12px),linear-gradient(180deg,#33201d,#241412)}
+.ptt:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.switch{display:flex;align-items:center;gap:10px;cursor:pointer;font:600 10.5px var(--mono);letter-spacing:.14em;color:var(--dim);text-transform:uppercase}
+.switch input{display:none}
+.sw{width:44px;height:22px;border-radius:20px;background:#152529;border:1px solid var(--line);position:relative;transition:.25s}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--faint);transition:.25s}
+.switch input:checked+.sw{background:rgba(65,224,141,.15);border-color:var(--green)}
+.switch input:checked+.sw::after{left:24px;background:var(--green);box-shadow:0 0 10px rgba(65,224,141,.8)}
+.ghost{font:600 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--dim);background:transparent;border:1px solid var(--line);border-radius:8px;padding:12px 16px;cursor:pointer;transition:.2s}
+.ghost:hover{border-color:rgba(255,95,86,.55);color:#ffb3ae}
+.honest{margin-top:16px;font:400 11.5px/1.6 var(--body);color:var(--faint);border-left:2px solid var(--line-hi);padding-left:12px}
+.honest b{color:var(--dim)}
+.field{margin-bottom:13px}.field:last-child{margin-bottom:0}
+.field label{display:flex;justify-content:space-between;align-items:baseline;font:600 10px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--faint);margin-bottom:6px}
+.field label output{color:var(--amber-hi);font-weight:700}
+input[type=text],input[type=password],select,textarea{width:100%;background:#0b1519;border:1px solid var(--line);border-radius:7px;color:var(--ink);font:500 13px var(--body);padding:10px 12px;outline:none;transition:border-color .2s,box-shadow .2s}
+textarea{font-size:12.5px;line-height:1.55;resize:vertical;min-height:120px}
+input:focus,select:focus,textarea:focus{border-color:var(--amber);box-shadow:0 0 0 3px rgba(255,180,84,.13)}
+select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238ea3a5' fill='none' stroke-width='1.5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;cursor:pointer}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:2px;background:#1c2f35;outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;border-radius:50%;background:var(--green);border:2.5px solid #0b1214;box-shadow:0 0 0 1px var(--green);transition:transform .15s}
+input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.25)}
+input[type=range]::-moz-range-thumb{width:13px;height:13px;border-radius:50%;background:var(--green);border:2.5px solid #0b1214}
+.keyrow{display:flex;gap:8px}
+.keyrow input{flex:1;font-family:var(--mono);font-size:12px}
+.eye{flex:0 0 auto;width:42px;border:1px solid var(--line);border-radius:7px;background:#0b1519;color:var(--dim);cursor:pointer;font-size:14px;transition:.2s}
+.eye:hover{border-color:var(--line-hi);color:var(--ink)}
+.hint{font:400 11px/1.5 var(--body);color:var(--faint);margin-top:6px}
+.hint b{color:var(--dim)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.shake{animation:shake .4s}
+@keyframes shake{20%,60%{transform:translateX(-5px)}40%,80%{transform:translateX(5px)}}
+.logs{grid-column:1/-1;margin-top:16px;animation-delay:.24s}
+.log-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.mini{font:600 10px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--dim);background:transparent;border:1px solid var(--line);border-radius:6px;padding:7px 12px;cursor:pointer;transition:.2s}
+.mini:hover{border-color:var(--amber);color:var(--amber-hi)}
+.log-grid{display:grid;grid-template-columns:1.45fr 1fr;gap:0;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.pane{background:#0b1418;min-height:240px;max-height:320px;overflow-y:auto;padding:14px}
+.pane+.pane{border-left:1px solid var(--line)}
+.pane-title{font:700 9.5px var(--mono);letter-spacing:.22em;color:var(--faint);text-transform:uppercase;margin-bottom:10px;position:sticky;top:-14px;background:#0b1418;padding:4px 0 6px}
+#transcript{display:flex;flex-direction:column;gap:9px}
+.msg{max-width:82%;padding:9px 12px;border-radius:8px;border:1px solid;font-size:13.5px;line-height:1.5;animation:pop .28s ease both;word-break:break-word}
+@keyframes pop{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+.msg .who{display:block;font:700 9px var(--mono);letter-spacing:.18em;margin-bottom:4px}
+.msg.u{align-self:flex-start;border-color:rgba(95,212,228,.32);background:rgba(95,212,228,.055)}
+.msg.u .who{color:var(--cyan)}
+.msg.a{align-self:flex-end;border-color:rgba(255,180,84,.32);background:rgba(255,180,84,.055)}
+.msg.a .who{color:var(--amber)}
+.msg.sys{align-self:center;border-color:var(--line);background:transparent;color:var(--faint);font:400 11px var(--mono);max-width:100%;text-align:center}
+.caret{display:inline-block;width:7px;background:var(--amber);animation:blink 1s steps(2) infinite;margin-left:1px}
+.empty-note{font:400 12px var(--body);color:var(--faint);font-style:italic}
+#httplog{font:400 10.5px/1.75 var(--mono)}
+#httplog .ln{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;animation:pop .2s ease both}
+#httplog .tm{color:#41585c}
+#httplog .ok{color:#9fe8c3}#httplog .err{color:#ffb3ae;font-weight:700}#httplog .inf{color:#a8dfe8}#httplog .wrn{color:var(--amber-hi)}
+.pane::-webkit-scrollbar{width:8px}
+.pane::-webkit-scrollbar-thumb{background:#1d3038;border-radius:4px}
+.pane::-webkit-scrollbar-thumb:hover{background:#2e4a54}
+footer{margin-top:22px;font:400 11.5px/1.7 var(--body);color:var(--faint);display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+footer code{font:500 10.5px var(--mono);color:var(--dim);background:#0d181c;border:1px solid var(--line);border-radius:4px;padding:2px 6px}
+#toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,16px);opacity:0;z-index:60;pointer-events:none;background:#15262c;border:1px solid var(--line-hi);border-left:3px solid var(--green);border-radius:8px;padding:11px 18px;font:500 13px var(--body);color:var(--ink);box-shadow:0 14px 40px rgba(0,0,0,.5);transition:.3s;max-width:88vw}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+#toast.err{border-left-color:var(--red);color:#ffc4bf}
+@media(max-width:980px){main{grid-template-columns:1fr}.log-grid{grid-template-columns:1fr}.pane+.pane{border-left:none;border-top:1px solid var(--line);max-height:180px}}
+</style>
+</head>
+<body>
+<div class="scan"></div>
+
+<div id="gate">
+  <div class="gate-card">
+    <div class="gate-head">
+      <div class="gate-mic">🎙️</div>
+      <div>
+        <h2>ДОСТУП К АУДИОСИСТЕМЕ</h2>
+        <div class="sub">rt·пульт · предполётная проверка</div>
+      </div>
+    </div>
+    <div class="checklist">
+      <div class="ck" id="ck-secure"><span class="lbl">secure context</span><span class="pill">…</span></div>
+      <div class="ck" id="ck-audio"><span class="lbl">web audio api</span><span class="pill">…</span></div>
+      <div class="ck" id="ck-media"><span class="lbl">media devices</span><span class="pill">…</span></div>
+      <div class="ck wait" id="ck-mic"><span class="lbl">микрофон</span><span class="pill">ожидает</span></div>
+    </div>
+    <button id="btn-mic" type="button">РАЗРЕШИТЬ МИКРОФОН</button>
+    <div class="gate-status wait" id="gate-status">нажми кнопку — браузер покажет запрос</div>
+    <div class="gate-meter" id="gate-meter"><i id="gate-level"></i></div>
+    <div class="gate-meter-lbl" id="gate-meter-lbl">уровень микрофона — скажи что-нибудь</div>
+    <div class="gate-warn" id="gate-warn"></div>
+    <div class="gate-err" id="gate-err"></div>
+  </div>
+</div>
+
+<div class="wrap" id="app">
+  <header>
+    <div class="brand">
+      <span class="dot" id="rec-dot"></span>
+      <div>
+        <h1>RT·<b>ПУЛЬТ</b> <span style="color:var(--faint);font-weight:600;font-size:11px;letter-spacing:.2em">/ OPENROUTER</span></h1>
+        <em>полудуплексный голосовой агент · rest api</em>
+      </div>
+    </div>
+    <div class="meters">
+      <div class="chip mic-chip" id="mic-chip" title="состояние микрофона"><span class="mdot" id="mic-dot"></span>МИК</div>
+      <div class="chip">реплики <b id="m-turns">0</b></div>
+      <div class="chip">токены <b class="cc" id="m-tok">0</b></div>
+      <div class="chip">≈ <b class="cg" id="m-cost">$0.0000</b></div>
+      <div class="chip">ttft <b class="ca" id="m-ttft">—</b></div>
+    </div>
+  </header>
+
+  <main>
+    <section class="panel pg">
+      <div class="statusline">
+        <div id="big-status">ЖМИ И ГОВОРИ</div>
+        <div class="lamps">
+          <span class="lamp-item"><i id="l-rec" class="r"></i>REC</span>
+          <span class="lamp-item"><i id="l-net" class="g"></i>ЗАПРОС</span>
+          <span class="lamp-item"><i id="l-snd" class="a"></i>ДИНАМИК</span>
+        </div>
+      </div>
+      <div class="lat-row">
+        <span class="lat">реплика: <b id="lat-total">—</b></span>
+        <span class="lat">первый текст: <b id="lat-ttft">—</b></span>
+        <span class="lat">аудио: <b id="lat-audio">—</b></span>
+      </div>
+      <div class="scope-box">
+        <span class="tag">осциллограф · pcm16</span>
+        <canvas id="scope"></canvas>
+      </div>
+      <div class="vu-row">
+        <div class="vu"><label>МИКРОФОН</label><div class="vu-bar"><i id="vu-in"></i></div></div>
+        <div class="vu"><label>ОТВЕТ АГЕНТА</label><div class="vu-bar"><i id="vu-out"></i></div></div>
+      </div>
+      <div class="ctrl">
+        <label class="switch"><input type="checkbox" id="f-auto"><span class="sw"></span>авторежим</label>
+        <button class="ptt" id="btn-ptt" type="button">ЖМИ И ГОВОРИ<small>или удерживай ПРОБЕЛ</small></button>
+        <button class="ghost" id="btn-stop" type="button">⏹ стоп</button>
+      </div>
+      <div class="honest"><b>Честно:</b> это не настоящий realtime. Цикл «запись → запрос → ответ» занимает 2–5 секунд, перебиваний нет. Для настоящего real-time (WebRTC, ~300 мс, barge-in) нужен нативный ключ OpenAI.</div>
+    </section>
+
+    <aside class="rack">
+      <section class="panel">
+        <h2>Подключение</h2>
+        <div class="field">
+          <label>OpenRouter API-ключ</label>
+          <div class="keyrow">
+            <input type="password" id="f-key" placeholder="sk-or-..." autocomplete="off">
+            <button class="eye" id="btn-eye" type="button" title="показать/скрыть">👁</button>
+          </div>
+          <div class="hint">Ключ живёт <b>только в браузере</b> (localStorage). Запросы идут на <b>openrouter.ai</b>.</div>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label>Модель</label>
+            <input type="text" id="f-model" list="models" spellcheck="false">
+            <datalist id="models">
+              <option value="openai/gpt-audio"></option>
+              <option value="openai/gpt-audio-mini"></option>
+            </datalist>
+          </div>
+          <div class="field">
+            <label>Голос</label>
+            <select id="f-voice">
+              <option value="nova">nova</option><option value="alloy">alloy</option>
+              <option value="coral">coral</option><option value="sage">sage</option>
+              <option value="ash">ash</option><option value="ballad">ballad</option>
+              <option value="echo">echo</option><option value="shimmer">shimmer</option>
+              <option value="onyx">onyx</option><option value="verse">verse</option>
+            </select>
+          </div>
+        </div>
+      </section>
+      <section class="panel">
+        <h2>Сценарий агента</h2>
+        <div class="field">
+          <label>Пресет</label>
+          <select id="f-preset">
+            <option value="cold">Холодный звонок</option>
+            <option value="inbound">Входящий лид</option>
+            <option value="orders">Приём заказов</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Системный промпт <output id="prompt-len"></output></label>
+          <textarea id="f-prompt" spellcheck="false"></textarea>
+        </div>
+      </section>
+      <section class="panel pc">
+        <h2>Авторежим (детекция тишины)</h2>
+        <div class="field">
+          <label>Тишина до отправки <output id="o-sil">900 ms</output></label>
+          <input type="range" id="f-sil" min="400" max="2500" step="50" value="900">
+        </div>
+        <div class="field">
+          <label>Порог громкости <output id="o-thr">0.020</output></label>
+          <input type="range" id="f-thr" min="0.005" max="0.1" step="0.005" value="0.02">
+        </div>
+        <div class="hint">В авторежиме агент сам слышит конец фразы. Эхо из динамиков может вызывать ложные срабатывания — используй наушники.</div>
+      </section>
+    </aside>
+
+    <section class="panel pc logs">
+      <div class="log-head">
+        <h2 style="margin:0">Журнал диалога</h2>
+        <div style="display:flex;gap:8px">
+          <button class="mini" id="btn-export" type="button">⬇ экспорт</button>
+          <button class="mini" id="btn-clear" type="button">✕ очистить</button>
+        </div>
+      </div>
+      <div class="log-grid">
+        <div class="pane"><div class="pane-title">Расшифровка</div><div id="transcript"><div class="empty-note">Зажми кнопку, скажи фразу — агент ответит голосом.</div></div></div>
+        <div class="pane"><div class="pane-title">HTTP · openrouter.ai</div><div id="httplog"></div></div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div>OpenRouter = REST, turn-based. Модель <code>openai/gpt-audio</code> · стриминг PCM16 → WAV · тарифы <code>$32/$64</code> за 1M аудио-токенов.</div>
+    <div>настоящий realtime → консоль на ключе OpenAI (WebRTC)</div>
+  </footer>
+</div>
+<div id="toast"></div>
+
+<script>
+"use strict";
+const $=id=>document.getElementById(id);
+const els={key:$("f-key"),model:$("f-model"),voice:$("f-voice"),preset:$("f-preset"),prompt:$("f-prompt"),auto:$("f-auto"),sil:$("f-sil"),thr:$("f-thr")};
+
+const PRESETS={
+cold:`Ты — голосовой менеджер компании «ТехноСервис» (ремонт электроники). Исходящий холодный звонок по заявке.
+
+Стиль: живой русский, короткие фразы 1–2 предложения. Без markdown, списков, эмодзи.
+
+Сценарий:
+1. Поздоровайся, спроси удобно ли говорить.
+2. Если нет — предложи перезвонить.
+3. Если да — уточни проблему и модель устройства.
+4. Предложи приехать в сервис или вызвать курьера.
+5. Зафиксируй договорённость, попрощайся.
+
+Правила: цены не называй; при возражениях не спорь; при агрессии — извинись и предложи менеджера.`,
+inbound:`Ты — оператор входящей линии «ТехноСервис». Клиент звонит сам.
+
+Стиль: живой русский, короткие фразы, без markdown.
+
+Задача: выяснить что сломано, модель, срочность. Предложи время визита или курьера. Цену не выдумывай. Подтверди договорённость и попрощайся.`,
+orders:`Ты — оператор приёма заказов «ТехноСервис» для действующих клиентов.
+
+Стиль: живой русский, цифры диктуй по одной. Без markdown.
+
+Сценарий: поздоровайся → спроси номер заказа или телефон → уточни что нужно → подтверди данные вслух → попрощайся.
+
+Правила: не выдумывай статусы; при негативе — извинись и предложи менеджера.`};
+
+const S={
+  state:"gate",history:[],dialog:[],turns:0,tokIn:0,tokOut:0,cost:0,
+  actx:null,micStream:null,micSrc:null,micAn:null,micBuf:null,recNode:null,recChunks:[],
+  currentRMS:0,playAn:null,playBuf:null,playSrcNode:null,
+  recog:null,userText:"",controller:null,busy:false,
+  speechActive:false,lastSpeech:0,hold:false,t0:0,micReady:false,micRequesting:false
+};
+
+let toastT=null;
+function toast(m,err){const t=$("toast");t.textContent=m;t.className=err?"show err":"show";clearTimeout(toastT);toastT=setTimeout(()=>t.className="",3600);}
+function lamp(id,on){$(id).classList.toggle("on",!!on);}
+function evT(){const s=Math.floor(performance.now()/1000);return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0");}
+function hlog(text,cls){const b=$("httplog"),d=document.createElement("div");d.className="ln";d.innerHTML='<span class="tm">['+evT()+']</span> <span class="'+(cls||"inf")+'">'+text+"</span>";b.appendChild(d);while(b.children.length>200)b.removeChild(b.firstChild);b.parentElement.scrollTop=b.parentElement.scrollHeight;}
+function b64ToBytes(b){const bin=atob(b),a=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i);return a;}
+function bytesToB64(bytes){let s="";for(let i=0;i<bytes.length;i+=8192)s+=String.fromCharCode.apply(null,bytes.subarray(i,i+8192));return btoa(s);}
+function concatBytes(arrs){let n=0;arrs.forEach(a=>n+=a.length);const o=new Uint8Array(n);let off=0;arrs.forEach(a=>{o.set(a,off);off+=a.length;});return o;}
+function wrapWAV(pcm,rate){
+  const buf=new ArrayBuffer(44+pcm.length),v=new DataView(buf);
+  const ws=(o,st)=>{for(let i=0;i<st.length;i++)v.setUint8(o+i,st.charCodeAt(i));};
+  ws(0,"RIFF");v.setUint32(4,36+pcm.length,true);ws(8,"WAVE");ws(12,"fmt ");
+  v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
+  v.setUint32(24,rate,true);v.setUint32(28,rate*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);
+  ws(36,"data");v.setUint32(40,pcm.length,true);
+  new Uint8Array(buf,44).set(pcm);return buf;
+}
+
+function setCk(id,state,label){const el=$(id);el.classList.remove("ok","err","wait","req");if(state)el.classList.add(state);el.querySelector(".pill").textContent=label;}
+function gateStatus(text,cls){const el=$("gate-status");el.textContent=text;el.className="gate-status "+cls;}
+function gateError(html){const el=$("gate-err");el.innerHTML=html;el.classList.add("show");}
+function gateWarn(html){const el=$("gate-warn");el.innerHTML=html;el.classList.add("show");}
+
+/* проверка среды БЕЗ автозапроса микрофона — кнопка всегда остаётся живой */
+function checkEnvironment(){
+  const rows=[
+    {id:"ck-secure",ok:window.isSecureContext||location.protocol==="file:"},
+    {id:"ck-audio",ok:!!(window.AudioContext||window.webkitAudioContext)},
+    {id:"ck-media",ok:!!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia)}
+  ];
+  rows.forEach((r,i)=>{
+    setTimeout(()=>{
+      $(r.id).classList.add("show");
+      setCk(r.id,r.ok?"ok":"err",r.ok?"ok":"нет");
+      if(!r.ok&&r.id==="ck-media")gateError("<b>Браузер не даёт доступ к медиа-устройствам.</b> Открой страницу по <b>HTTPS</b> или <b>localhost</b> в Chrome/Edge.");
+    },200+i*260);
+  });
+  setTimeout(()=>{
+    if(location.protocol==="file:")gateWarn('Файл открыт как <code>file://</code>. Надёжнее: <code>python -m http.server 8000</code> → <code>http://localhost:8000</code>');
+    $("ck-mic").classList.add("show");
+  },200+rows.length*260);
+  /* только ПОКАЗЫВАЕМ состояние разрешения, ничего не запрашиваем сами */
+  (async()=>{
+    try{
+      if(navigator.permissions&&navigator.permissions.query){
+        const p=await navigator.permissions.query({name:"microphone"});
+        if(p.state==="granted"){
+          setCk("ck-mic","ok","разрешение есть");
+          gateStatus("разрешение уже есть — нажми кнопку, чтобы подключиться","ok");
+        }else if(p.state==="denied"){
+          setCk("ck-mic","err","запрещён");
+          gateStatus("микрофон запрещён ранее","err");
+          gateError("<b>Доступ к микрофону был отклонён ранее.</b> Нажми на 🔒 в адресной строке → «Разрешения сайта» → Микрофон → «Разрешить», затем нажми кнопку.");
+        }else{
+          setCk("ck-mic","wait","ожидает");
+          gateStatus("нажми кнопку — браузер покажет запрос","wait");
+        }
+      }
+    }catch(e){/* Firefox не поддерживает query для микрофона — ждём клика */}
+  })();
+}
+
+/* getUserMedia с тайм-аутом — не может зависнуть навсегда */
+function micWithTimeout(constraints,ms){
+  return Promise.race([
+    navigator.mediaDevices.getUserMedia(constraints),
+    new Promise((_,rej)=>setTimeout(()=>rej(new Error("TIMEOUT")),ms))
+  ]);
+}
+
+async function requestMic(){
+  if(S.micRequesting)return;           /* защита от двойного клика */
+  S.micRequesting=true;
+  const btn=$("btn-mic");
+  btn.textContent="ЗАПРАШИВАЮ…";        /* мгновенная реакция на клик */
+  setCk("ck-mic","req","запрашиваю");
+  gateStatus("браузер показывает запрос разрешения…","req");
+  $("gate-err").classList.remove("show");
+  try{
+    let stream;
+    try{
+      stream=await micWithTimeout({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}},8000);
+    }catch(e){
+      if(e.message==="TIMEOUT"||e.name==="OverconstrainedError"){
+        stream=await micWithTimeout({audio:true},8000);   /* повтор без доп. настроек */
+      }else throw e;
+    }
+    onMicGranted(stream);
+  }catch(err){
+    handleMicError(err);
+  }finally{
+    S.micRequesting=false;
+    if(!S.micReady)btn.textContent="ПОПРОБОВАТЬ ЕЩЁ РАЗ";  /* кнопка ВСЕГДА жива */
+  }
+}
+
+function handleMicError(err){
+  setCk("ck-mic","err","ошибка");gateStatus("не удалось получить микрофон","err");
+  const n=err.name||"";
+  if(n==="TIMEOUT")gateError("<b>Запрос микрофона завис (8 сек).</b> Закрой другие вкладки, использующие микрофон, и нажми ещё раз.");
+  else if(n==="NotAllowedError"||n==="PermissionDeniedError")gateError("<b>Ты нажал «Запретить»</b> (или браузер заблокировал). 🔒 в адресной строке → «Разрешения сайта» → Микрофон → «Разрешить» → нажми снова.");
+  else if(n==="NotFoundError"||n==="DevicesNotFoundError")gateError("<b>Микрофон не найден.</b> Подключи микрофон и нажми ещё раз.");
+  else if(n==="NotReadableError"||n==="TrackStartError")gateError("<b>Микрофон занят другим приложением.</b> Закрой Zoom, Skype, Telegram — и нажми ещё раз.");
+  else if(n==="SecurityError")gateError("<b>Доступ заблокирован политикой безопасности.</b> Открой через локальный сервер: <code>python -m http.server 8000</code> → <code>http://localhost:8000</code>");
+  else gateError("<b>Ошибка:</b> "+n+" — "+(err.message||"")+". Попробуй Chrome/Edge или localhost.");
+}
+
+function onMicGranted(stream){
+  S.micStream=stream;S.micReady=true;
+  initAudioGraph(stream);
+  stream.getTracks().forEach(tr=>{tr.onended=()=>{S.micReady=false;$("mic-dot").classList.remove("on");toast("Микрофон отключён системой",true);};});
+  const btn=$("btn-mic");
+  btn.classList.add("ok");btn.textContent="✓ МИКРОФОН АКТИВЕН";
+  setCk("ck-mic","ok","разрешён");gateStatus("микрофон подключён ✓","ok");
+  $("gate-meter").classList.add("show");$("gate-meter-lbl").classList.add("show");$("mic-dot").classList.add("on");
+  startGateMeter();hlog("микрофон захвачен · разрешение получено","ok");
+  setTimeout(()=>{$("gate").classList.add("hidden");$("app").classList.add("active");$("rec-dot").classList.add("live");S.state="idle";setStatus("idle");toast("Микрофон активен — жми PTT и говори");},1300);
+}
+
+function startGateMeter(){
+  if(!S.micAn)return;
+  const buf=new Uint8Array(S.micAn.fftSize);
+  (function tick(){
+    if(!$("gate").classList.contains("hidden")){
+      S.micAn.getByteTimeDomainData(buf);
+      let s=0;for(let i=0;i<buf.length;i++){const v=(buf[i]-128)/128;s+=v*v;}
+      $("gate-level").style.width=Math.min(100,Math.sqrt(s/buf.length)*400)+"%";
+      requestAnimationFrame(tick);
+    }
+  })();
+}
+
+$("btn-mic").addEventListener("click",requestMic);
+$("mic-chip").addEventListener("click",()=>{
+  if(S.micReady){toast("Микрофон активен ✓");return;}
+  $("gate").classList.remove("hidden");$("app").classList.remove("active");
+  $("btn-mic").classList.remove("ok");$("btn-mic").textContent="РАЗРЕШИТЬ МИКРОФОН";
+  setCk("ck-mic","wait","ожидает");gateStatus("нажми кнопку — браузер покажет запрос","wait");
+});
+
+function initAudioGraph(stream){
+  const ctx=new (window.AudioContext||window.webkitAudioContext)();
+  S.actx=ctx;if(ctx.state==="suspended")ctx.resume();
+  S.micSrc=ctx.createMediaStreamSource(stream);
+  S.micAn=ctx.createAnalyser();S.micAn.fftSize=1024;S.micBuf=new Uint8Array(S.micAn.fftSize);
+  S.micSrc.connect(S.micAn);
+  S.recNode=ctx.createScriptProcessor(4096,1,1);
+  const mute=ctx.createGain();mute.gain.value=0;
+  S.micSrc.connect(S.recNode);S.recNode.connect(mute);mute.connect(ctx.destination);
+  S.recNode.onaudioprocess=e=>{
+    if(S.hold||S.busy)return;
+    const f=e.inputBuffer.getChannelData(0);
+    const i16=new Int16Array(f.length);
+    for(let i=0;i<f.length;i++){const v=Math.max(-1,Math.min(1,f[i]));i16[i]=v<0?v*0x8000:v*0x7FFF;}
+    S.recChunks.push(i16);
+    let s=0;for(let i=0;i<f.length;i++)s+=f[i]*f[i];
+    S.currentRMS=Math.sqrt(s/f.length);
+  };
+}
+function ensureCtx(){if(S.actx&&S.actx.state==="suspended")S.actx.resume();return S.actx;}
+function ensurePlayGraph(){
+  if(S.playAn)return;
+  const ctx=ensureCtx();
+  S.playAn=ctx.createAnalyser();S.playAn.fftSize=1024;S.playBuf=new Uint8Array(S.playAn.fftSize);
+  S.playAn.connect(ctx.destination);
+}
+
+function takeRecording(){
+  const rate=S.actx?S.actx.sampleRate:48000;
+  const pcm=concatBytes(S.recChunks.map(c=>new Uint8Array(c.buffer)));
+  S.recChunks=[];
+  if(pcm.length<rate*0.15)return null;
+  return {b64:bytesToB64(pcm),rate,sec:pcm.length/2/rate};
+}
+
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+function startSR(){
+  if(!SR)return;
+  try{
+    S.recog=new SR();S.recog.lang="ru-RU";S.recog.continuous=true;S.recog.interimResults=true;
+    S.userText="";
+    S.recog.onresult=e=>{let fin=S.userText;for(let i=e.resultIndex;i<e.results.length;i++){if(e.results[i].isFinal)fin+=e.results[i][0].transcript;}S.userText=fin;};
+    S.recog.onerror=()=>{};
+    S.recog.onend=()=>{if((S.state==="rec"||S.state==="auto")&&S.recog){try{S.recog.start();}catch(e){}}};
+    S.recog.start();
+  }catch(e){S.recog=null;}
+}
+function stopSR(){if(S.recog){try{S.recog.stop();}catch(e){}S.recog=null;}}
+
+function setStatus(m){
+  const el=$("big-status");el.className="";
+  if(m==="idle")el.textContent="ЖМИ И ГОВОРИ";
+  if(m==="rec"){el.textContent="ЗАПИСЬ · ГОВОРИ";el.className="rec";}
+  if(m==="think"){el.innerHTML='АГЕНТ ДУМАЕТ<span class="dots"><span>.</span><span>.</span><span>.</span></span>';el.className="think";}
+  if(m==="speak"){el.textContent="АГЕНТ ГОВОРИТ";el.className="speak";}
+  if(m==="auto"){el.textContent="АВТО · СЛУШАЮ";el.className="auto";}
+}
+
+function pttDown(){
+  if(S.busy||els.auto.checked||!S.micReady)return;
+  if(!els.key.value.trim()){toast("Вставь OpenRouter API-ключ",true);els.key.classList.add("shake");setTimeout(()=>els.key.classList.remove("shake"),450);return;}
+  ensureCtx();
+  S.recChunks=[];S.state="rec";setStatus("rec");lamp("l-rec",true);
+  $("btn-ptt").classList.add("hold");
+  startSR();
+}
+function pttUp(){
+  if(S.state!=="rec")return;
+  lamp("l-rec",false);$("btn-ptt").classList.remove("hold");
+  stopSR();
+  const rec=takeRecording();
+  if(!rec){S.state="idle";setStatus("idle");toast("Слишком короткая фраза");return;}
+  sendTurn(rec,S.userText.trim());
+}
+const ptt=$("btn-ptt");
+ptt.addEventListener("pointerdown",e=>{e.preventDefault();pttDown();});
+window.addEventListener("pointerup",pttUp);
+window.addEventListener("keydown",e=>{
+  const typing=/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
+  if(e.code==="Space"&&!typing&&!els.auto.checked){e.preventDefault();if(!e.repeat)pttDown();}
+  if(e.key==="Escape")stopAll();
+});
+window.addEventListener("keyup",e=>{if(e.code==="Space")pttUp();});
+
+els.auto.addEventListener("change",()=>{
+  save();
+  if(els.auto.checked){
+    if(!els.key.value.trim()){toast("Вставь ключ для авторежима",true);els.auto.checked=false;return;}
+    if(!S.micReady){toast("Сначала разреши микрофон",true);els.auto.checked=false;return;}
+    ensureCtx();
+    S.recChunks=[];S.speechActive=false;S.state="auto";setStatus("auto");
+    lamp("l-rec",true);startSR();ptt.disabled=true;
+    toast("Авторежим: говори — агент сам услышит конец фразы");
+  }else{stopAuto();}
+});
+function stopAuto(){
+  els.auto.checked=false;save();
+  stopSR();lamp("l-rec",false);ptt.disabled=false;
+  S.speechActive=false;S.recChunks=[];
+  if(S.state==="auto"){S.state="idle";setStatus("idle");}
+}
+setInterval(()=>{
+  if(!els.auto.checked||S.state!=="auto"||S.busy)return;
+  const thr=+els.thr.value,sil=+els.sil.value;
+  if(S.currentRMS>thr){S.speechActive=true;S.lastSpeech=Date.now();}
+  else if(S.speechActive&&Date.now()-S.lastSpeech>sil){
+    S.speechActive=false;stopSR();
+    const rec=takeRecording();const txt=S.userText.trim();
+    if(rec)sendTurn(rec,txt);else{S.userText="";startSR();}
+  }
+},90);
+
+function stopAll(){
+  if(S.controller){try{S.controller.abort();}catch(e){}}
+  if(S.playSrcNode){try{S.playSrcNode.stop();}catch(e){}}
+  if(els.auto.checked)stopAuto();
+  if(S.state!=="idle"&&S.state!=="gate"){S.state="idle";setStatus("idle");}
+  lamp("l-net",false);lamp("l-snd",false);lamp("l-rec",false);
+}
+$("btn-stop").addEventListener("click",stopAll);
+
+async function sendTurn(rec,userText){
+  S.busy=true;S.state="think";setStatus("think");lamp("l-net",true);
+  S.t0=performance.now();let ttft=null;
+  S.history.push({role:"user",content:[{type:"input_audio",input_audio:{data:rec.b64,format:"wav"}}]});
+  const body={
+    model:els.model.value.trim()||"openai/gpt-audio",
+    stream:true,stream_options:{include_usage:true},
+    modalities:["text","audio"],
+    audio:{voice:els.voice.value,format:"pcm16"},
+    messages:[{role:"system",content:els.prompt.value},...S.history]
+  };
+  S.controller=new AbortController();
+  const aChunks=[];let transcript="",contentText="",usage=null,audioReadyAt=null;
+  addUserBubble(userText||"(речь без расшифровки)",rec.sec);
+  const draft=startAgentBubble();
+  hlog("POST /api/v1/chat/completions · "+body.model+" · аудио "+rec.sec.toFixed(1)+" c","wrn");
+  try{
+    const res=await fetch("https://openrouter.ai/api/v1/chat/completions",{
+      method:"POST",
+      headers:{"Authorization":"Bearer "+els.key.value.trim(),"Content-Type":"application/json","HTTP-Referer":"https://rtpult.local","X-Title":"RT PULT"},
+      body:JSON.stringify(body),signal:S.controller.signal
+    });
+    if(!res.ok){const t=await res.text();throw new Error("HTTP "+res.status+" — "+t.slice(0,180));}
+    const reader=res.body.getReader(),dec=new TextDecoder();let buf="";
+    while(true){
+      const {done,value}=await reader.read();if(done)break;
+      buf+=dec.decode(value,{stream:true});let idx;
+      while((idx=buf.indexOf("\n"))>=0){
+        const line=buf.slice(0,idx).trim();buf=buf.slice(idx+1);
+        if(!line.startsWith("data:"))continue;
+        const payload=line.slice(5).trim();if(payload==="[DONE]")continue;
+        let j;try{j=JSON.parse(payload);}catch(e){continue;}
+        if(j.usage)usage=j.usage;
+        if(j.error)throw new Error(j.error.message||"ошибка провайдера");
+        const d=j.choices&&j.choices[0]&&j.choices[0].delta;if(!d)continue;
+        if(d.audio){
+          if(d.audio.data){aChunks.push(b64ToBytes(d.audio.data));if(!audioReadyAt)audioReadyAt=performance.now();}
+          if(d.audio.transcript){transcript+=d.audio.transcript;if(ttft===null)ttft=performance.now()-S.t0;draft.update(transcript);}
+        }
+        if(d.content)contentText+=d.content;
+      }
+    }
+  }catch(e){
+    draft.remove();
+    if(e.name==="AbortError"){hlog("запрос отменён","err");addSys("— отменено —");}
+    else{hlog("ОШИБКА: "+e.message,"err");toast("⚠ "+e.message,true);addSys("ошибка: "+e.message);}
+    S.history[S.history.length-1]={role:"user",content:userText||"(речь клиента)"};
+    finishTurn();return;
+  }
+  const total=performance.now()-S.t0;
+  if(usage){
+    S.tokIn+=usage.prompt_tokens||0;S.tokOut+=usage.completion_tokens||0;
+    S.cost+=((usage.prompt_tokens||0)*32+(usage.completion_tokens||0)*64)/1e6;
+    $("m-tok").textContent=(S.tokIn+S.tokOut).toLocaleString("ru-RU");
+    $("m-cost").textContent="$"+S.cost.toFixed(4);
+  }
+  let played=false;
+  if(aChunks.length){
+    const raw=concatBytes(aChunks);let wavBuf;
+    if(raw.length>4&&raw[0]===0x52&&raw[1]===0x49)wavBuf=raw.buffer.slice(raw.byteOffset,raw.byteOffset+raw.length);
+    else wavBuf=wrapWAV(raw,24000);
+    draft.final(transcript||contentText||"(ответ без текста)");
+    playWav(wavBuf);played=true;
+  }else{
+    draft.final(contentText||"(модель ответила пустым аудио)");
+    if(!contentText)toast("Аудио не пришло — проверь модель и баланс",true);
+  }
+  hlog("OK · "+(total/1000).toFixed(1)+" c · токены "+((usage&&usage.prompt_tokens)||"?")+"/"+((usage&&usage.completion_tokens)||"?"),"ok");
+  S.history[S.history.length-1]={role:"user",content:userText||"(речь клиента)"};
+  S.history.push({role:"assistant",content:transcript||contentText||""});
+  if(S.history.length>24)S.history=S.history.slice(-24);
+  $("lat-total").textContent=(total/1000).toFixed(2)+" c";
+  $("lat-ttft").textContent=ttft?(ttft/1000).toFixed(2)+" c":"—";
+  $("lat-audio").textContent=audioReadyAt?((audioReadyAt-S.t0)/1000).toFixed(2)+" c":"—";
+  $("m-ttft").textContent=ttft?(ttft/1000).toFixed(1)+" c":"—";
+  if(!played)finishTurn();
+}
+function finishTurn(){
+  S.busy=false;lamp("l-net",false);
+  if(!els.auto.checked){S.state="idle";setStatus("idle");}
+  else{S.state="auto";setStatus("auto");S.userText="";S.recChunks=[];setTimeout(()=>{if(els.auto.checked&&S.state==="auto")startSR();},350);}
+}
+
+async function playWav(buf){
+  const ctx=ensureCtx();ensurePlayGraph();
+  try{
+    const ab=await ctx.decodeAudioData(buf);
+    const src=ctx.createBufferSource();src.buffer=ab;
+    src.connect(S.playAn);S.playSrcNode=src;
+    S.state="speak";setStatus("speak");lamp("l-snd",true);
+    src.onended=()=>{lamp("l-snd",false);S.playSrcNode=null;finishTurn();};
+    src.start();
+  }catch(e){toast("Не удалось декодировать аудио: "+e.message,true);hlog("decode error: "+e.message,"err");finishTurn();}
+}
+
+function clearNote(){const n=$("transcript").querySelector(".empty-note");if(n)n.remove();}
+function scrollT(){const p=$("transcript").parentElement;p.scrollTop=p.scrollHeight;}
+function addUserBubble(text,sec){
+  clearNote();const d=document.createElement("div");d.className="msg u";
+  d.innerHTML='<span class="who">ТЫ · '+evT()+" · "+sec.toFixed(1)+' c</span>';
+  d.appendChild(document.createTextNode(text));
+  $("transcript").appendChild(d);scrollT();
+  S.dialog.push({t:evT(),who:"Клиент",text});S.turns++;$("m-turns").textContent=S.turns;
+}
+function startAgentBubble(){
+  clearNote();const d=document.createElement("div");d.className="msg a";
+  d.innerHTML='<span class="who">АГЕНТ · '+evT()+'</span><span class="txt"></span><span class="caret">&nbsp;</span>';
+  $("transcript").appendChild(d);scrollT();
+  return{
+    update(t){d.querySelector(".txt").textContent=t;scrollT();},
+    final(t){const c=d.querySelector(".caret");if(c)c.remove();d.querySelector(".txt").textContent=t||"…";S.dialog.push({t:evT(),who:"Агент",text:t||""});scrollT();},
+    remove(){d.remove();}
+  };
+}
+function addSys(t){clearNote();const d=document.createElement("div");d.className="msg sys";d.textContent=t;$("transcript").appendChild(d);scrollT();}
+
+$("btn-export").addEventListener("click",()=>{
+  if(!S.dialog.length){toast("Пока пусто");return;}
+  const txt="RT PULT · OpenRouter · "+new Date().toLocaleString("ru-RU")+"\nмодель: "+els.model.value+" · голос: "+els.voice.value+"\n"+"─".repeat(44)+"\n"+
+    S.dialog.map(d=>"["+d.t+"] "+d.who+": "+d.text).join("\n")+
+    "\n"+"─".repeat(44)+"\nреплик: "+S.turns+" · токены: "+(S.tokIn+S.tokOut)+" · ≈ "+$("m-cost").textContent;
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([txt],{type:"text/plain;charset=utf-8"}));
+  a.download="dialog-"+Date.now()+".txt";a.click();
+});
+$("btn-clear").addEventListener("click",()=>{
+  $("transcript").innerHTML='<div class="empty-note">Диалог очищен.</div>';
+  $("httplog").innerHTML="";S.dialog=[];S.history=[];
+});
+
+const LS="rtpult-or-v5";
+function save(){const o={};["key","model","voice","preset","prompt","sil","thr"].forEach(k=>o[k]=els[k].value);o.auto=els.auto.checked;try{localStorage.setItem(LS,JSON.stringify(o));}catch(e){}}
+function load(){let o={};try{o=JSON.parse(localStorage.getItem(LS)||"{}");}catch(e){}
+  els.model.value=o.model||"openai/gpt-audio";els.voice.value=o.voice||"nova";
+  els.preset.value=o.preset||"cold";
+  els.prompt.value=(o.prompt!=null)?o.prompt:PRESETS[els.preset.value];
+  els.sil.value=o.sil||900;els.thr.value=o.thr||0.02;if(o.key)els.key.value=o.key;
+  sync();promptLen();
+}
+function sync(){$("o-sil").textContent=els.sil.value+" ms";$("o-thr").textContent=(+els.thr.value).toFixed(3);}
+function promptLen(){$("prompt-len").textContent=els.prompt.value.length+" симв.";}
+Object.values(els).forEach(el=>{el.addEventListener("input",()=>{save();sync();promptLen();});el.addEventListener("change",()=>{save();sync();});});
+els.preset.addEventListener("change",()=>{els.prompt.value=PRESETS[els.preset.value];promptLen();save();});
+$("btn-eye").addEventListener("click",()=>{els.key.type=els.key.type==="password"?"text":"password";});
+
+const cvs=$("scope"),cx=cvs.getContext("2d");
+function size(){const r=cvs.getBoundingClientRect(),d=window.devicePixelRatio||1;cvs.width=r.width*d;cvs.height=170*d;cx.setTransform(d,0,0,d,0,0);}
+addEventListener("resize",size);size();
+function trace(an,buf,color,dir,glow){
+  const w=cvs.getBoundingClientRect().width,h=170,mid=h/2,amp=h/2-8;
+  cx.beginPath();if(an)an.getByteTimeDomainData(buf);
+  const n=an?buf.length:240;
+  for(let i=0;i<n;i++){
+    let v;
+    if(an)v=(buf[i]-128)/128;
+    else v=Math.sin(i*.08+performance.now()*.0022)*.045+Math.sin(i*.019+performance.now()*.0011)*.028;
+    const x=i/(n-1)*w,y=mid+dir*Math.abs(v)*amp;
+    i===0?cx.moveTo(x,y):cx.lineTo(x,y);
+  }
+  cx.strokeStyle=color;cx.lineWidth=1.6;cx.shadowColor=glow;cx.shadowBlur=8;cx.stroke();cx.shadowBlur=0;
+}
+(function draw(){
+  requestAnimationFrame(draw);
+  const w=cvs.getBoundingClientRect().width,h=170;
+  cx.clearRect(0,0,w,h);
+  cx.strokeStyle="rgba(255,255,255,.06)";cx.lineWidth=1;
+  cx.beginPath();cx.moveTo(0,h/2);cx.lineTo(w,h/2);cx.stroke();
+  const rec=(S.state==="rec"||S.state==="auto")&&S.micAn;
+  const spk=S.state==="speak"&&S.playAn;
+  trace(rec?S.micAn:(spk?S.playAn:null),rec?S.micBuf:(spk?S.playBuf:null),"rgba(95,212,228,.9)",1,"rgba(95,212,228,.5)");
+  trace(spk?S.playAn:null,spk?S.playBuf:null,"rgba(255,180,84,.9)",-1,"rgba(255,180,84,.55)");
+  let rmsIn=0,rmsOut=0;
+  if(S.micAn&&(S.state==="rec"||S.state==="auto")){S.micAn.getByteTimeDomainData(S.micBuf);let s=0;for(let i=0;i<S.micBuf.length;i++){const v=(S.micBuf[i]-128)/128;s+=v*v;}rmsIn=Math.sqrt(s/S.micBuf.length);}
+  if(S.playAn&&S.state==="speak"){S.playAn.getByteTimeDomainData(S.playBuf);let s=0;for(let i=0;i<S.playBuf.length;i++){const v=(S.playBuf[i]-128)/128;s+=v*v;}rmsOut=Math.sqrt(s/S.playBuf.length);}
+  $("vu-in").style.width=Math.min(100,rmsIn*340)+"%";
+  $("vu-out").style.width=Math.min(100,rmsOut*340)+"%";
+})();
+
+load();
+if(!SR)hlog("Web Speech API недоступен — реплики клиента будут без расшифровки","wrn");
+hlog("консоль загружена · прохожу предполётную проверку","ok");
+checkEnvironment();
+</script>
+</body>
+</html>

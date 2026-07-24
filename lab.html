@@ -180,9 +180,9 @@ async function errText(res){
 /* on=выбрана по умолчанию (поддерживает русский). voice — стартовый, редактируемый.
    confident=голос точно валиден; иначе предположение (поправь по ошибке). */
 const TTS_MODELS=[
-  {model:"google/gemini-3.1-flash-tts-preview",voice:"Kore",on:true,confident:true,note:"70+ языков, теги эмоций"},
+  {model:"google/gemini-3.1-flash-tts-preview",voice:"Kore",on:true,confident:true,fmt:"pcm",note:"70+ языков, теги эмоций"},
   {model:"x-ai/grok-voice-tts-1.0",voice:"Eve",on:true,confident:true,note:"голоса: Eve/Ara/Rex/Sal/Leo"},
-  {model:"openai/gpt-4o-mini-tts",voice:"nova",on:true,confident:true,note:"базлайн (англ. акцент)"},
+  {model:"openai/gpt-4o-mini-tts-2025-12-15",voice:"nova",on:true,confident:true,note:"базлайн (англ. акцент)"},
   {model:"microsoft/mai-voice-2",voice:"ru-RU-Dariya:MAI-Voice-2",on:true,confident:false,note:"15 языков — голос уточни"},
   {model:"microsoft/mai-voice-2-flash",voice:"ru-RU-Dariya:MAI-Voice-2-Flash",on:true,confident:false,note:"low-latency — голос уточни"},
   {model:"qwen/qwen-audio-3.0-tts-flash",voice:"Cherry",on:true,confident:false,note:"голос уточни по ошибке"},
@@ -241,17 +241,32 @@ function playTTS(url,tr){
   ttsAudio=new Audio(url);
   return new Promise(res=>{ttsAudio.onended=ttsAudio.onerror=()=>{tr.classList.remove("play");if(tr.classList.contains("ok")||tr.querySelector(".st").textContent==="готово")tr.classList.add("ok");res();};ttsAudio.play().catch(res);});
 }
-async function ttsSpeak(model,voice,text){
+async function ttsSpeak(model,voice,text,fmt){
+  fmt=fmt||"mp3";
   const t0=performance.now();
   const res=await fetch("https://openrouter.ai/api/v1/audio/speech",{
     method:"POST",
     headers:{"Authorization":"Bearer "+KEY(),"Content-Type":"application/json","HTTP-Referer":location.origin,"X-Title":"RT LAB"},
-    body:JSON.stringify({model,input:text,voice,response_format:"mp3"})
+    body:JSON.stringify({model,input:text,voice,response_format:fmt})
   });
-  if(!res.ok)throw new Error(await errText(res));
-  const blob=await res.blob();
-  if(!blob.size)throw new Error("пустой ответ");
-  return {url:URL.createObjectURL(blob),ms:Math.round(performance.now()-t0)};
+  if(!res.ok){
+    const msg=await errText(res);
+    /* авто-фолбэк на pcm, если модель не принимает mp3 (Gemini и др.) */
+    if(fmt!=="pcm"&&/pcm|response_format|format/i.test(msg))return ttsSpeak(model,voice,text,"pcm");
+    throw new Error(msg);
+  }
+  const ab=await res.arrayBuffer();
+  if(!ab.byteLength)throw new Error("пустой ответ");
+  let blob;
+  if(fmt==="pcm"){
+    const bytes=new Uint8Array(ab);
+    /* сырой PCM 24кГц/16бит/моно → оборачиваем в WAV; если уже RIFF — как есть */
+    const wavAb=(bytes.length>4&&bytes[0]===0x52&&bytes[1]===0x49)?ab:wrapWAV(bytes,24000);
+    blob=new Blob([wavAb],{type:"audio/wav"});
+  }else{
+    blob=new Blob([ab],{type:"audio/mpeg"});
+  }
+  return {url:URL.createObjectURL(blob),ms:Math.round(performance.now()-t0),fmt};
 }
 async function ttsAll(){
   if(!KEY()){toast("Вставь ключ",true);return;}
@@ -264,8 +279,9 @@ async function ttsAll(){
     if(ttsCache[model]){setTTS(tr,"ok","готово","кэш");tr.querySelector(".play").disabled=false;await playTTS(ttsCache[model],tr);continue;}
     setTTS(tr,"run","синтез…","");
     try{
-      const r=await ttsSpeak(model,voice,text);
-      ttsCache[model]=r.url;setTTS(tr,"ok","готово",r.ms+" мс");tr.querySelector(".play").disabled=false;
+      const cfg=TTS_MODELS[+tr.dataset.i]||{};
+      const r=await ttsSpeak(model,voice,text,cfg.fmt);
+      ttsCache[model]=r.url;setTTS(tr,"ok","готово",r.ms+" мс"+(r.fmt==="pcm"?" · pcm":""));tr.querySelector(".play").disabled=false;
       if(ttsAbort)break;
       await playTTS(r.url,tr);
     }catch(e){

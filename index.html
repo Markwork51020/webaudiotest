@@ -426,6 +426,21 @@ function wrapWAV(pcm,rate){
   new Uint8Array(buf,44).set(pcm);return buf;
 }
 
+/* разворачивает обёртку OpenRouter → достаёт настоящую ошибку OpenAI с полем param (вход/выход) */
+function explainErr(text){
+  try{
+    let o=typeof text==="string"?JSON.parse(text):text;
+    let e=o.error||o;
+    /* OpenRouter кладёт исходную ошибку провайдера строкой в metadata.raw */
+    if(e.metadata&&e.metadata.raw){try{const inner=JSON.parse(e.metadata.raw);e=inner.error||inner;}catch(_){return e.message+" · raw: "+e.metadata.raw;}}
+    const parts=[];
+    if(e.message)parts.push(e.message);
+    if(e.param)parts.push("param="+e.param);
+    if(e.code)parts.push("code="+e.code);
+    if(e.type)parts.push("type="+e.type);
+    return parts.join(" · ")||text.slice(0,300);
+  }catch(_){return String(text).slice(0,300);}
+}
 function setCk(id,state,label){const el=$(id);el.classList.remove("ok","err","wait","req");if(state)el.classList.add(state);el.querySelector(".pill").textContent=label;}
 function gateStatus(text,cls){const el=$("gate-status");el.textContent=text;el.className="gate-status "+cls;}
 function gateError(html){const el=$("gate-err");el.innerHTML=html;el.classList.add("show");}
@@ -694,7 +709,7 @@ async function sendTurn(rec,userText){
       headers:{"Authorization":"Bearer "+els.key.value.trim(),"Content-Type":"application/json","HTTP-Referer":"https://rtpult.local","X-Title":"RT PULT"},
       body:JSON.stringify(body),signal:S.controller.signal
     });
-    if(!res.ok){const t=await res.text();throw new Error("HTTP "+res.status+" — "+t.slice(0,180));}
+    if(!res.ok){const t=await res.text();hlog("HTTP "+res.status+" тело: "+explainErr(t),"err");throw new Error("HTTP "+res.status+" — "+explainErr(t));}
     const reader=res.body.getReader(),dec=new TextDecoder();let buf="";
     while(true){
       const {done,value}=await reader.read();if(done)break;
@@ -705,7 +720,7 @@ async function sendTurn(rec,userText){
         const payload=line.slice(5).trim();if(payload==="[DONE]")continue;
         let j;try{j=JSON.parse(payload);}catch(e){continue;}
         if(j.usage)usage=j.usage;
-        if(j.error)throw new Error(j.error.message||"ошибка провайдера");
+        if(j.error){hlog("stream error: "+explainErr(JSON.stringify(j)),"err");throw new Error(explainErr(JSON.stringify(j)));}
         const d=j.choices&&j.choices[0]&&j.choices[0].delta;if(!d)continue;
         if(d.audio){
           if(d.audio.data){aChunks.push(b64ToBytes(d.audio.data));if(!audioReadyAt)audioReadyAt=performance.now();}

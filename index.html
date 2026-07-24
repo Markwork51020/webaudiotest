@@ -580,7 +580,9 @@ function takeRecording(){
   const pcm=concatBytes(S.recChunks.map(c=>new Uint8Array(c.buffer)));
   S.recChunks=[];
   if(pcm.length<rate*0.15)return null;
-  return {b64:bytesToB64(pcm),rate,sec:pcm.length/2/rate};
+  /* модель ждёт валидный WAV-файл (RIFF/WAVE), а не сырой PCM — оборачиваем с реальным sample rate */
+  const wav=new Uint8Array(wrapWAV(pcm,rate));
+  return {b64:bytesToB64(wav),rate,sec:pcm.length/2/rate};
 }
 
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;

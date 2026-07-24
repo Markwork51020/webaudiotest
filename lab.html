@@ -60,6 +60,10 @@ td input[type=text]{font:600 11.5px var(--mono);padding:6px 8px}
 .st{font:600 9px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--faint);white-space:nowrap}
 tr.ok .st{color:var(--green)}tr.err .st{color:var(--red)}tr.play .st{color:var(--amber-hi)}tr.run .st{color:var(--cyan)}
 .ms{font:600 11px var(--mono);color:var(--dim);white-space:nowrap}
+tr.fast td{background:rgba(65,224,141,.1)!important}
+.rank{display:inline-block;min-width:16px;text-align:center;font:800 10px var(--mono);color:#03210f;background:var(--green);border-radius:4px;padding:1px 4px;margin-right:5px}
+.rank.r2{background:var(--cyan);color:#042227}.rank.r3{background:var(--amber);color:#221503}
+.fastbadge{font:800 10px var(--mono);color:var(--green)}
 .tr{font:400 12.5px/1.45 var(--body);color:var(--ink)}
 .tr.empty{color:var(--faint);font-style:italic}
 .err-txt{font:400 11px/1.4 var(--mono);color:#ffb3ae;word-break:break-word}
@@ -281,7 +285,8 @@ async function ttsAll(){
     try{
       const cfg=TTS_MODELS[+tr.dataset.i]||{};
       const r=await ttsSpeak(model,voice,text,cfg.fmt);
-      ttsCache[model]=r.url;setTTS(tr,"ok","готово",r.ms+" мс"+(r.fmt==="pcm"?" · pcm":""));tr.querySelector(".play").disabled=false;
+      ttsCache[model]=r.url;tr.dataset.ms=r.ms;
+      setTTS(tr,"ok","готово",(r.ms/1000).toFixed(2)+" с"+(r.fmt==="pcm"?" · pcm":""));tr.querySelector(".play").disabled=false;
       if(ttsAbort)break;
       await playTTS(r.url,tr);
     }catch(e){
@@ -289,7 +294,24 @@ async function ttsAll(){
     }
   }
   $("tts-all").disabled=false;
-  if(!ttsAbort)toast("TTS готово — ▶ у строки переслушивает бесплатно");
+  const best=rankFastest("tts-body");
+  if(!ttsAbort)toast(best?"⚡ Быстрейший TTS: "+best.model+" — "+best.s+" с":"TTS готово");
+}
+
+/* ранжирование строк по времени: ⚡ быстрейший + места ①②③, подсветка №1 */
+function rankFastest(bodyId){
+  const rows=[...document.querySelectorAll("#"+bodyId+" tr")].filter(r=>r.classList.contains("ok")&&r.dataset.ms);
+  document.querySelectorAll("#"+bodyId+" tr").forEach(r=>{r.classList.remove("fast");const m=r.querySelector(".ms");if(m){const b=m.querySelector(".rank");if(b)b.remove();}});
+  if(!rows.length)return null;
+  rows.sort((a,b)=>(+a.dataset.ms)-(+b.dataset.ms));
+  rows.forEach((r,idx)=>{
+    if(idx>2)return;
+    const m=r.querySelector(".ms");
+    const badge=document.createElement("span");badge.className="rank"+(idx===1?" r2":idx===2?" r3":"");badge.textContent=idx+1;
+    m.insertBefore(badge,m.firstChild);
+  });
+  rows[0].classList.add("fast");
+  return {model:rows[0].querySelector(".cm").value.trim(),s:(+rows[0].dataset.ms/1000).toFixed(2)};
 }
 
 /* ── запись для STT ────────────────────────────────────── */
@@ -378,8 +400,8 @@ async function sttAll(){
     tr.classList.remove("ok","err");tr.classList.add("run");tr.querySelector(".st").textContent="распознаю…";
     try{
       const r=await sttTranscribe(model,lastWav,lastFmt);
-      tr.classList.remove("run");tr.classList.add("ok");tr.querySelector(".st").textContent="готово";
-      tr.querySelector(".ms").textContent=r.ms+" мс"+(r.cost!=null?" · $"+r.cost.toFixed(4):"");
+      tr.classList.remove("run");tr.classList.add("ok");tr.querySelector(".st").textContent="готово";tr.dataset.ms=r.ms;
+      tr.querySelector(".ms").textContent=(r.ms/1000).toFixed(2)+" с"+(r.cost!=null?" · $"+r.cost.toFixed(4):"");
       cell.className="tr";cell.textContent=r.text||"(пусто)";
     }catch(e){
       tr.classList.remove("run");tr.classList.add("err");tr.querySelector(".st").textContent="ошибка";
@@ -387,7 +409,8 @@ async function sttAll(){
     }
   }));
   $("stt-all").disabled=false;
-  toast("STT готово — сравни расшифровки");
+  const best=rankFastest("stt-body");
+  toast(best?"⚡ Быстрейший STT: "+best.model+" — "+best.s+" с":"STT готово");
 }
 
 /* ── события / инициализация ───────────────────────────── */

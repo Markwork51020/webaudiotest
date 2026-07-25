@@ -67,8 +67,6 @@ body.busy #ledNet{background:var(--cyan);box-shadow:0 0 8px var(--cyan);animatio
 .cnt{margin-left:auto;display:flex;gap:18px;text-align:right}
 .cnt .k{font-family:'IBM Plex Mono';font-size:9px;letter-spacing:.16em;color:var(--dim);text-transform:uppercase}
 .cnt .v{font-family:'IBM Plex Mono';font-size:15px;font-weight:500}
-.lab-link{font-family:'IBM Plex Mono';font-size:11px;letter-spacing:.1em;color:var(--cyan);text-decoration:none;border:1px solid var(--line2);padding:7px 11px;text-transform:uppercase;transition:.15s}
-.lab-link:hover{border-color:var(--cyan);box-shadow:0 0 12px rgba(90,200,255,.18)}
 
 /* ---------- сетка ---------- */
 main{position:relative;z-index:1;display:grid;grid-template-columns:1.25fr .9fr;gap:18px;padding:20px 22px;max-width:1300px;margin:0 auto}
@@ -137,14 +135,6 @@ input:focus,select:focus,textarea:focus{border-color:var(--amber);box-shadow:0 0
 .btn.warn:hover{border-color:var(--red);color:var(--red);box-shadow:0 0 10px rgba(255,97,97,.12)}
 .btn.sm{padding:5px 9px;font-size:10px}
 
-/* ---------- проба голосов ---------- */
-.vt-btns{display:flex;gap:8px;margin-top:11px;flex-wrap:wrap}
-.vt-row{display:grid;grid-template-columns:38px 1fr 64px 62px;gap:8px;align-items:center;padding:7px 8px;border:1px solid var(--line);margin-top:6px;font-family:'IBM Plex Mono';font-size:11px;background:#0a0f15;transition:.15s}
-.vt-row:hover{border-color:var(--line2);background:#0d131b}
-.vt-v{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.vt-st{color:var(--dim)} .vt-st.run{color:var(--amber);animation:bl .5s infinite alternate} .vt-st.ok{color:var(--green)} .vt-st.bad{color:var(--red)}
-.vt-tm{color:var(--dim);text-align:right}
-
 /* ---------- журнал ---------- */
 #log{max-height:360px;overflow-y:auto;padding-right:4px}
 .entry{padding:9px 10px;border-left:2px solid;margin-bottom:8px;background:#0a0f15;animation:in .3s ease both}
@@ -196,7 +186,6 @@ footer b{color:var(--txt);font-weight:500}
     <div><div class="k">≈ $</div><div class="v" id="vCost">0.0000</div></div>
     <div><div class="k">цикл</div><div class="v" id="vCycle">—</div></div>
   </div>
-  <a class="lab-link" href="lab.html">rt·лаб →</a>
 </header>
 
 <main>
@@ -226,9 +215,9 @@ footer b{color:var(--txt);font-weight:500}
       <div class="stage" id="st-llm"><i class="led"></i><div class="n">02</div><div class="nm">LLM</div>
         <div class="md" id="stLlmModel">openai/gpt-4o-mini</div><div class="tm">—</div></div>
       <div class="stage" id="st-tts"><i class="led"></i><div class="n">03</div><div class="nm">TTS</div>
-        <div class="md" title="microsoft/mai-voice-2-flash">microsoft/mai-voice-2-flash</div><div class="tm">—</div></div>
+        <div class="md" title="minimax/speech-2.8-turbo">minimax/speech-2.8-turbo</div><div class="tm">—</div></div>
     </div>
-    <div class="honest">Честно: это каскад, не realtime — «запись → whisper → llm → mai-voice → динамик» занимает ~2–6 секунд, перебиваний нет. Для настоящего realtime (WebRTC, ~300 мс, barge-in) нужен нативный ключ OpenAI.</div>
+    <div class="honest">Честно: это каскад, не realtime — «запись → whisper → llm → minimax → динамик» занимает ~2–6 секунд, перебиваний нет. Для настоящего realtime (WebRTC, ~300 мс, barge-in) нужен нативный ключ OpenAI.</div>
   </section>
 
   <aside>
@@ -247,22 +236,17 @@ footer b{color:var(--txt);font-weight:500}
         <option value="__custom">другая модель…</option>
       </select>
       <div id="llmCustomRow" style="display:none;margin-top:8px"><input type="text" id="llmCustom" placeholder="vendor/model"></div>
-      <label class="f">Провайдер озвучки · tts</label>
+      <label class="f">Озвучка · tts</label>
       <select id="ttsProv">
-        <option value="microsoft/mai-voice-2-flash">microsoft/mai-voice-2-flash — 15 языков (Harper=en, акцент)</option>
-        <option value="minimax/speech-2.8-turbo">minimax/speech-2.8-turbo — нативный русский, быстрый</option>
-        <option value="minimax/speech-2.8-hd">minimax/speech-2.8-hd — нативный русский, HD</option>
-        <option value="yandex">yandex speechkit — эталонный русский (свой ключ)</option>
+        <option value="minimax/speech-2.8-turbo">minimax/speech-2.8-turbo — быстрый</option>
+        <option value="minimax/speech-2.8-hd">minimax/speech-2.8-hd — качество</option>
       </select>
       <label class="f">Голос агента</label>
-      <input type="text" id="voice" value="en-US-Harper:MAI-Voice-2">
-      <div id="yxRow" style="display:none">
-        <label class="f">Yandex Api-Key</label>
-        <div class="keyrow"><input type="password" id="yxKey" placeholder="Api-Key Яндекс Облака" autocomplete="off"></div>
-        <label class="f">Yandex folderId</label>
-        <input type="text" id="yxFolder" placeholder="b1g...">
-      </div>
-      <div class="note">MAI-Voice отдаёт pcm16 → пульт заворачивает в wav 24 кГц; Harper — en-US, русский с акцентом. <b>MiniMax</b>: нативные голоса <b>Russian_ReliableMan</b>, <b>Russian_HandsomeChildhoodFriend</b>. <b>Yandex</b>: alena/filipp/jane… — носители, но браузер может блокировать запрос (CORS) → тогда нужен прокси. Голос неверный — ошибка перечислит доступные.</div>
+      <select id="voice">
+        <option value="Russian_AmbitiousWoman">Russian_AmbitiousWoman — женский</option>
+        <option value="Russian_HandsomeChildhoodFriend">Russian_HandsomeChildhoodFriend — мужской</option>
+      </select>
+      <div class="note">MiniMax — нативные русские голоса, без иностранного акцента. Ответ приходит в mp3.</div>
     </div>
 
     <!-- сценарий -->
@@ -288,18 +272,6 @@ footer b{color:var(--txt);font-weight:500}
       <div class="note">В авторежиме агент сам слышит конец фразы. Эхо из динамиков вызывает ложные срабатывания — используй наушники.</div>
     </div>
 
-    <!-- проба голосов -->
-    <div class="panel">
-      <h3>проба голосов · mai-voice-2-flash</h3>
-      <label class="f">Тестовая фраза</label>
-      <textarea id="vtPhrase" rows="3">Здравствуйте! Меня зовут Алиса, я голосовой ассистент. Сегодня двадцать пятое июля, на улице плюс двадцать три градуса. Чем могу помочь?</textarea>
-      <label class="f">Голоса (через запятую)</label>
-      <input type="text" id="vtVoices" value="en-US-Harper:MAI-Voice-2">
-      <div class="vt-btns"><button class="btn" id="vtAll">▶ прослушать все</button><button class="btn warn" id="vtStop">⏹ стоп</button></div>
-      <div id="vtRows"></div>
-      <div class="note">ответ: голый pcm16 → пульт пакует в wav 24 кГц · озвучка платная (~центы за прогон) · результат кэшируется — повторное прослушивание бесплатно. ▶ у строки — переслушать.</div>
-    </div>
-
     <!-- журнал -->
     <div class="panel">
       <h3>журнал диалога<span class="sp"></span><button class="btn sm" id="exp">⬇ экспорт</button><button class="btn sm warn" id="clr">✕ очистить</button></h3>
@@ -309,7 +281,7 @@ footer b{color:var(--txt);font-weight:500}
 </main>
 
 <footer>
-  HTTP · openrouter.ai — <b>openai/whisper-large-v3-turbo</b> (транскрибация, язык ru) → llm (мозг) → <b>microsoft/mai-voice-2-flash</b> (pcm16 → wav 24 кГц) · голос <b>en-US-Harper:MAI-Voice-2</b> · тарифы на openrouter.ai<br>
+  HTTP · openrouter.ai — <b>openai/whisper-large-v3-turbo</b> (транскрибация, язык ru) → llm (мозг) → <b>minimax/speech-2.8-turbo</b> · голоса <b>Russian_AmbitiousWoman</b> / <b>Russian_HandsomeChildhoodFriend</b> (нативный русский, mp3) · тарифы на openrouter.ai<br>
   настоящий realtime → webrtc-консоль на нативном ключе OpenAI
 </footer>
 
@@ -318,9 +290,9 @@ footer b{color:var(--txt);font-weight:500}
 const $=s=>document.getElementById(s);
 const API='https://openrouter.ai/api/v1';
 const STT_MODEL='openai/whisper-large-v3-turbo';
-const TTS_MODEL='microsoft/mai-voice-2-flash';
-const DEF_VOICE='en-US-Harper:MAI-Voice-2';
-const PCM_RATE=24000; // mai-voice-2 отдаёт pcm16 24 кГц моно
+const TTS_MODEL='minimax/speech-2.8-turbo';
+const DEF_VOICE='Russian_AmbitiousWoman';
+const PCM_RATE=24000; // если провайдер отдаст голый pcm16 — пакуем в wav
 
 const PRESETS={
 cold:`Ты — Алиса, менеджер по продажам компании «Ртуть-Трейд» (оптовые поставки лакокрасочных материалов). Ты звонишь холодному клиенту. Говори только по-русски, живо и коротко: не больше двух предложений за реплику. Сначала поздоровайся и спроси, удобно ли говорить. Цель — выяснить потребность в поставках и договориться об отправке коммерческого предложения. Без списков, разметки и канцелярита — только разговорная речь.`,
@@ -329,9 +301,8 @@ order:`Ты — Алиса, оператор приёма заказов ком�
 
 const S={key:localStorage.getItem('rt_key')||'',turns:0,tokens:0,cost:0,
   busy:false,rec:false,playing:false,auto:false,chunks:[],recStart:0,lastAct:0,actStart:0,
-  history:[],abort:null,src:null,rms:0,vtStop:false};
+  history:[],abort:null,src:null,rms:0};
 let AC=null,proc=null,micAn=null,agtAn=null,stream=null,fallbackAudio=null;
-const vtCache=new Map();
 
 /* ---------- гейт ---------- */
 function chk(id,ok,txt){const el=$(id);el.textContent=txt;el.className='cst '+(ok?'ok':'bad');}
@@ -455,19 +426,15 @@ async function llm(text,sig){
   if(j.usage){S.tokens+=j.usage.total_tokens||0;S.cost+=j.usage.total_cost||0;}
   return (j.choices&&j.choices[0]&&j.choices[0].message?j.choices[0].message.content:'').trim();
 }
-/* TTS: возвращает {blob, meta}. Провайдер выбирается в «Подключение».
-   OpenRouter (mai/minimax) → /audio/speech: pcm→wav, mp3 как есть, json→base64.
-   Yandex SpeechKit → свой эндпоинт и ключ. */
-function ttsProvider(){return ($('ttsProv')&&$('ttsProv').value)||TTS_MODEL;}
+/* TTS: MiniMax через OpenRouter /audio/speech. Возвращает {blob, meta}.
+   Обычно приходит mp3; голый pcm16 и json+base64 тоже поддержаны. */
+function ttsModel(){return ($('ttsProv')&&$('ttsProv').value)||TTS_MODEL;}
 async function tts(text,sig,voice){
-  if(ttsProvider()==='yandex')return yandexTts(text,sig,voice);
-  const model=ttsProvider();
+  const model=ttsModel();
   voice=voice||$('voice').value.trim()||DEF_VOICE;
-  const body={model:model,voice:voice,input:text};
-  if(model.startsWith('minimax'))body.response_format='mp3';
   const r=await fetch(API+'/audio/speech',{method:'POST',signal:sig,
     headers:{...auth(),'Content-Type':'application/json'},
-    body:JSON.stringify(body)});
+    body:JSON.stringify({model:model,voice:voice,input:text,response_format:'mp3'})});
   if(!r.ok)throw new Error(await errTxt(r,'TTS'));
   const ct=r.headers.get('content-type')||'';
   if(ct.includes('json')){
@@ -492,41 +459,10 @@ async function tts(text,sig,voice){
   }
   return {blob:blob,meta:meta};
 }
-/* Yandex SpeechKit — отдельный провайдер и ключ (не через OpenRouter) */
-async function yandexTts(text,sig,voice){
-  voice=voice||$('voice').value.trim()||'alena';
-  const key=$('yxKey').value.trim();
-  if(!key)throw new Error('YANDEX-TTS · нет Api-Key Яндекса (блок «Подключение»)');
-  const p=new URLSearchParams();
-  p.set('text',text);p.set('lang','ru-RU');p.set('voice',voice);p.set('format','mp3');
-  const folder=$('yxFolder').value.trim();if(folder)p.set('folderId',folder);
-  let r;
-  try{
-    r=await fetch('https://tts.api.cloud.yandex.net/speech/v1/tts:synthesize',
-      {method:'POST',signal:sig,headers:{'Authorization':'Api-Key '+key},body:p});
-  }catch(e){throw new Error('YANDEX-TTS · '+(e.message||e)+' — вероятно CORS: Яндекс не пускает запрос из браузера, нужен прокси');}
-  if(!r.ok)throw new Error(await errTxt(r,'YANDEX-TTS'));
-  const blob=await r.blob();
-  if(!blob.size)throw new Error('YANDEX-TTS · пустой ответ');
-  return {blob:blob,meta:'yandex '+voice+' · mp3 · '+(blob.size/1024).toFixed(0)+' кб'};
-}
-
-/* дефолтные голоса и список для «пробы» под каждый провайдер */
-const TTS_DEFAULTS={
-  'microsoft/mai-voice-2-flash':{voice:'en-US-Harper:MAI-Voice-2',vt:'en-US-Harper:MAI-Voice-2'},
-  'minimax/speech-2.8-turbo':{voice:'Russian_ReliableMan',vt:'Russian_ReliableMan, Russian_HandsomeChildhoodFriend, Calm_Woman, Wise_Woman'},
-  'minimax/speech-2.8-hd':{voice:'Russian_ReliableMan',vt:'Russian_ReliableMan, Russian_HandsomeChildhoodFriend, Calm_Woman, Wise_Woman'},
-  'yandex':{voice:'alena',vt:'alena, filipp, jane, omazh, zahar, ermil'}
-};
-function applyProv(resetVoice){
-  const p=$('ttsProv').value;
-  $('yxRow').style.display=p==='yandex'?'block':'none';
+/* плитка TTS в конвейере показывает текущую модель */
+function applyProv(){
   const md=$('st-tts').querySelector('.md');
-  md.textContent=(p==='yandex'?'yandex speechkit':p);md.title=md.textContent;
-  if(resetVoice&&TTS_DEFAULTS[p]){
-    $('voice').value=TTS_DEFAULTS[p].voice;$('vtVoices').value=TTS_DEFAULTS[p].vt;
-    localStorage.setItem('rt_voice',$('voice').value);
-  }
+  md.textContent=ttsModel();md.title=md.textContent;
 }
 
 async function runCycle(wav){
@@ -651,37 +587,6 @@ function addEntry(cls,tag,tx,meta){
 }
 function updCounters(){$('vTurns').textContent=S.turns;$('vTok').textContent=S.tokens;$('vCost').textContent=S.cost.toFixed(4);}
 
-/* ---------- проба голосов ---------- */
-async function vtSpeak(v,phrase,st,tm){
-  const key=v+'|'+phrase;
-  if(vtCache.has(key)){st.textContent='кэш ✓';st.className='vt-st ok';await playAudio(vtCache.get(key));return;}
-  st.textContent='запрос…';st.className='vt-st run';
-  const t0=performance.now();
-  try{
-    const A=await tts(phrase,null,v);
-    vtCache.set(key,A.blob);
-    st.textContent='✓';st.className='vt-st ok';tm.textContent=fmt(performance.now()-t0);
-    await playAudio(A.blob);
-  }catch(e){st.textContent='✕';st.className='vt-st bad';tm.title=String(e.message||e);}
-}
-async function vtRun(){
-  if(!S.key){addEntry('err','ошибка','Сначала ключ OpenRouter');return;}
-  const voices=$('vtVoices').value.split(',').map(s=>s.trim()).filter(Boolean);
-  const phrase=$('vtPhrase').value.trim();
-  if(!voices.length||!phrase)return;
-  S.vtStop=false;$('vtRows').innerHTML='';
-  for(const v of voices){
-    if(S.vtStop)break;
-    const r=document.createElement('div');r.className='vt-row';
-    r.innerHTML='<button class="btn sm">▶</button><div class="vt-v"></div><div class="vt-st">—</div><div class="vt-tm">—</div>';
-    r.querySelector('.vt-v').textContent=v;
-    $('vtRows').appendChild(r);
-    const st=r.querySelector('.vt-st'),tm=r.querySelector('.vt-tm');
-    r.querySelector('button').onclick=()=>vtSpeak(v,phrase,st,tm);
-    await vtSpeak(v,phrase,st,tm);
-  }
-}
-
 /* ---------- события ---------- */
 const ptt=$('ptt');
 ptt.addEventListener('pointerdown',e=>{e.preventDefault();startRec(false);});
@@ -694,7 +599,7 @@ window.addEventListener('keydown',e=>{
   e.preventDefault();if(!e.repeat)startRec(false);
 });
 window.addEventListener('keyup',e=>{if(e.code==='Space'&&S.rec)finishRec();});
-$('stop').onclick=()=>{S.vtStop=true;if(S.abort)S.abort.abort();stopPlay();if(S.rec){S.rec=false;S.chunks=[];$('ptt').classList.remove('rec');$('ptt').innerHTML='ЖМИ И<br>ГОВОРИ';}};
+$('stop').onclick=()=>{if(S.abort)S.abort.abort();stopPlay();if(S.rec){S.rec=false;S.chunks=[];$('ptt').classList.remove('rec');$('ptt').innerHTML='ЖМИ И<br>ГОВОРИ';}};
 $('autoSw').onclick=()=>{
   S.auto=!S.auto;$('autoSw').classList.toggle('on',S.auto);$('autoState').textContent=S.auto?'вкл':'выкл';
   if(S.auto)addEntry('sys','система','Авторежим включён — агент сам слышит конец фразы. Наушники обязательны.');
@@ -707,13 +612,13 @@ $('llmSel').onchange=e=>{
   localStorage.setItem('rt_llm',e.target.value);
 };
 $('llmCustom').addEventListener('input',()=>{$('stLlmModel').textContent=currentLlm();localStorage.setItem('rt_llm_c',$('llmCustom').value);});
-$('voice').addEventListener('input',()=>localStorage.setItem('rt_voice',$('voice').value));
-$('ttsProv').onchange=()=>{applyProv(true);localStorage.setItem('rt_ttsprov',$('ttsProv').value);};
-$('yxKey').addEventListener('input',()=>localStorage.setItem('rt_yxkey',$('yxKey').value));
-$('yxFolder').addEventListener('input',()=>localStorage.setItem('rt_yxfolder',$('yxFolder').value));
-$('preset').onchange=e=>{$('sysp').value=PRESETS[e.target.value]||'';};
-$('vtAll').onclick=vtRun;
-$('vtStop').onclick=()=>{S.vtStop=true;stopPlay();};
+$('voice').onchange=()=>localStorage.setItem('rt_voice',$('voice').value);
+$('ttsProv').onchange=()=>{applyProv();localStorage.setItem('rt_ttsprov',$('ttsProv').value);};
+$('preset').onchange=e=>{$('sysp').value=PRESETS[e.target.value]||'';
+  localStorage.setItem('rt_preset',e.target.value);localStorage.setItem('rt_sysp',$('sysp').value);};
+$('sysp').addEventListener('input',()=>localStorage.setItem('rt_sysp',$('sysp').value));
+$('sil').addEventListener('input',()=>localStorage.setItem('rt_sil',$('sil').value));
+$('thr').addEventListener('input',()=>localStorage.setItem('rt_thr',$('thr').value));
 $('exp').onclick=()=>{
   const lines=[...$('log').querySelectorAll('.entry')].map(e=>'['+e.querySelector('.tag').textContent+'] '+e.querySelector('.tx').textContent);
   if(!lines.length)return;
@@ -734,11 +639,14 @@ $('clr').onclick=()=>{$('log').innerHTML='';S.history=[];addEntry('sys','сис�
   $('stLlmModel').textContent=currentLlm();
   const tp=localStorage.getItem('rt_ttsprov');
   if(tp&&[...$('ttsProv').options].some(o=>o.value===tp))$('ttsProv').value=tp;
-  $('yxKey').value=localStorage.getItem('rt_yxkey')||'';
-  $('yxFolder').value=localStorage.getItem('rt_yxfolder')||'';
-  const v=localStorage.getItem('rt_voice');if(v)$('voice').value=v;
-  applyProv(false);
-  $('sysp').value=PRESETS.cold;
+  const v=localStorage.getItem('rt_voice');
+  if(v&&[...$('voice').options].some(o=>o.value===v))$('voice').value=v;
+  applyProv();
+  const pr=localStorage.getItem('rt_preset');
+  if(pr&&PRESETS[pr])$('preset').value=pr;
+  $('sysp').value=localStorage.getItem('rt_sysp')||PRESETS[$('preset').value]||PRESETS.cold;
+  const sl=localStorage.getItem('rt_sil');if(sl)$('sil').value=sl;
+  const th=localStorage.getItem('rt_thr');if(th)$('thr').value=th;
 })();
 </script>
 </body>

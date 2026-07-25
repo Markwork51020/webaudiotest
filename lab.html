@@ -122,6 +122,20 @@ a.mlink:hover{color:var(--cyan)}
     </div>
   </section>
 
+  <section class="panel pg">
+    <h2>Yandex SpeechKit · озвучка <span class="note">эталонный русский · отдельный ключ</span></h2>
+    <div class="toolbar">
+      <input type="password" id="yx-key" placeholder="Api-Key Яндекс Облака" style="max-width:260px">
+      <input type="text" id="yx-folder" placeholder="folderId" style="max-width:180px">
+      <button class="btn g" id="yx-all" type="button">▶ прослушать все</button>
+      <button class="ghost" id="yx-stop" type="button">⏹ стоп</button>
+    </div>
+    <div class="hint" style="margin-bottom:12px">Берёт ту же тестовую фразу сверху. Ключ: Yandex Cloud → сервисный аккаунт с ролью <b>ai.speechkit-tts.user</b> → API-ключ; <b>folderId</b> — из консоли облака. Голоса alena/filipp/jane… — носители, акцента нет. <b>⚠ Возможен CORS:</b> если браузер выдаст «Failed to fetch», Яндекс не пускает запрос прямо со страницы — тогда подниму серверлес-прокси на Vercel.</div>
+    <div class="tablewrap">
+      <table id="yx-table"><thead><tr><th></th><th>Голос</th><th></th><th>Статус</th><th>Время</th><th>Тип</th></tr></thead><tbody id="yx-body"></tbody></table>
+    </div>
+  </section>
+
   <section class="panel pc">
     <h2>Расшифровка · STT <span class="note">одна запись → все модели</span></h2>
     <div class="toolbar">
@@ -192,8 +206,11 @@ const TTS_MODELS=[
   {model:"qwen/qwen-audio-3.0-tts-flash",voice:"Cherry",on:true,confident:false,note:"голос уточни по ошибке"},
   {model:"qwen/qwen-audio-3.0-tts-plus",voice:"Cherry",on:true,confident:false,note:"голос уточни по ошибке"},
   {model:"deepgram/aura-2",voice:"aura-2-thalia-en",on:true,confident:false,note:"русский голос уточни"},
-  {model:"minimax/speech-2.8-hd",voice:"male-qn-qingse",on:true,confident:false,note:"voice id уточни"},
-  {model:"minimax/speech-2.8-turbo",voice:"male-qn-qingse",on:true,confident:false,note:"voice id уточни"},
+  {model:"minimax/speech-2.8-hd",voice:"Russian_ReliableMan",on:true,confident:true,note:"★ натив RU (муж)"},
+  {model:"minimax/speech-2.8-hd",voice:"Russian_HandsomeChildhoodFriend",on:true,confident:true,note:"★ натив RU (муж, тёплый)"},
+  {model:"minimax/speech-2.8-hd",voice:"Calm_Woman",on:true,confident:false,note:"мультиязычный (жен)"},
+  {model:"minimax/speech-2.8-hd",voice:"Wise_Woman",on:true,confident:false,note:"мультиязычный (жен)"},
+  {model:"minimax/speech-2.8-turbo",voice:"Russian_ReliableMan",on:true,confident:true,note:"★ натив RU, быстрый"},
   {model:"mistralai/voxtral-mini-tts-2603",voice:"default",on:true,confident:false,note:"клонирование — голос уточни"},
   {model:"hexgrad/kokoro-82m",voice:"af_heart",on:false,confident:false,note:"нет русского"},
   {model:"zyphra/zonos-v0.1-transformer",voice:"american_female",on:false,confident:false,note:"только английский"},
@@ -230,13 +247,14 @@ function buildTTS(){
       '<td class="st">—</td><td class="ms"></td>'+
       '<td class="note'+(m.confident?"":" warn")+'">'+esc(m.note)+'</td>';
     tr.querySelector(".ck").addEventListener("change",e=>{tr.classList.toggle("off",!e.target.checked);});
-    tr.querySelector(".play").addEventListener("click",()=>{const u=ttsCache[curModel(tr)];if(u)playTTS(u,tr);});
+    tr.querySelector(".play").addEventListener("click",()=>{const u=ttsCache[cacheKey(tr)];if(u)playTTS(u,tr);});
     tr.querySelectorAll("input[type=text]").forEach(inp=>inp.addEventListener("input",()=>{setTTS(tr,"","—","");tr.querySelector(".play").disabled=true;}));
     b.appendChild(tr);
   });
 }
 function curModel(tr){return tr.querySelector(".cm").value.trim();}
 function curVoice(tr){return tr.querySelector(".cv").value.trim();}
+function cacheKey(tr){return curModel(tr)+"|"+curVoice(tr);}
 function setTTS(tr,cls,st,ms){tr.classList.remove("run","play","ok","err");if(cls)tr.classList.add(cls);tr.querySelector(".st").textContent=st;tr.querySelector(".ms").textContent=ms||"";}
 function playTTS(url,tr){
   if(ttsAudio){try{ttsAudio.pause();}catch(e){}}
@@ -279,13 +297,13 @@ async function ttsAll(){
   const rows=[...$("tts-body").querySelectorAll("tr")].filter(r=>r.querySelector(".ck").checked);
   for(const tr of rows){
     if(ttsAbort)break;
-    const model=curModel(tr),voice=curVoice(tr);
-    if(ttsCache[model]){setTTS(tr,"ok","готово","кэш");tr.querySelector(".play").disabled=false;await playTTS(ttsCache[model],tr);continue;}
+    const model=curModel(tr),voice=curVoice(tr),ck=cacheKey(tr);
+    if(ttsCache[ck]){setTTS(tr,"ok","готово","кэш");tr.querySelector(".play").disabled=false;await playTTS(ttsCache[ck],tr);continue;}
     setTTS(tr,"run","синтез…","");
     try{
       const cfg=TTS_MODELS[+tr.dataset.i]||{};
       const r=await ttsSpeak(model,voice,text,cfg.fmt);
-      ttsCache[model]=r.url;tr.dataset.ms=r.ms;
+      ttsCache[ck]=r.url;tr.dataset.ms=r.ms;
       setTTS(tr,"ok","готово",(r.ms/1000).toFixed(2)+" с"+(r.fmt==="pcm"?" · pcm":""));tr.querySelector(".play").disabled=false;
       if(ttsAbort)break;
       await playTTS(r.url,tr);
@@ -311,7 +329,8 @@ function rankFastest(bodyId){
     m.insertBefore(badge,m.firstChild);
   });
   rows[0].classList.add("fast");
-  return {model:rows[0].querySelector(".cm").value.trim(),s:(+rows[0].dataset.ms/1000).toFixed(2)};
+  const nameEl=rows[0].querySelector(".cm")||rows[0].querySelector(".cv");
+  return {model:nameEl?nameEl.value.trim():"?",s:(+rows[0].dataset.ms/1000).toFixed(2)};
 }
 
 /* ── запись для STT ────────────────────────────────────── */
@@ -413,6 +432,84 @@ async function sttAll(){
   toast(best?"⚡ Быстрейший STT: "+best.model+" — "+best.s+" с":"STT готово");
 }
 
+/* ── Yandex SpeechKit (отдельный провайдер) ────────────── */
+const YX_VOICES=[
+  {v:"alena",n:"alena · жен, нейтральный"},
+  {v:"filipp",n:"filipp · муж"},
+  {v:"jane",n:"jane · жен"},
+  {v:"omazh",n:"omazh · жен"},
+  {v:"zahar",n:"zahar · муж"},
+  {v:"ermil",n:"ermil · муж"},
+  {v:"dasha",n:"dasha · жен (премиум)"},
+  {v:"julia",n:"julia · жен (премиум)"},
+  {v:"lera",n:"lera · жен (премиум)"},
+  {v:"marina",n:"marina · жен (премиум)"},
+  {v:"alexander",n:"alexander · муж (премиум)"},
+  {v:"kirill",n:"kirill · муж (премиум)"},
+  {v:"anton",n:"anton · муж (премиум)"}
+];
+const yxCache={};let yxAbort=false,yxAudio=null;
+function buildYX(){
+  const b=$("yx-body");b.innerHTML="";
+  YX_VOICES.forEach((m,i)=>{
+    const tr=document.createElement("tr");tr.dataset.i=i;
+    tr.innerHTML='<td><input type="checkbox" class="ck" checked></td>'+
+      '<td><input type="text" class="cv" value="'+esc(m.v)+'"></td>'+
+      '<td><button class="play" disabled>▶</button></td>'+
+      '<td class="st">—</td><td class="ms"></td>'+
+      '<td class="note">'+esc(m.n)+'</td>';
+    tr.querySelector(".ck").addEventListener("change",e=>{tr.classList.toggle("off",!e.target.checked);});
+    tr.querySelector(".play").addEventListener("click",()=>{const u=yxCache[tr.querySelector(".cv").value.trim()];if(u)playYX(u,tr);});
+    b.appendChild(tr);
+  });
+}
+function playYX(url,tr){
+  if(yxAudio){try{yxAudio.pause();}catch(e){}}
+  document.querySelectorAll("#yx-body tr.play").forEach(r=>r.classList.remove("play"));
+  tr.classList.add("play");yxAudio=new Audio(url);
+  return new Promise(res=>{yxAudio.onended=yxAudio.onerror=()=>{tr.classList.remove("play");res();};yxAudio.play().catch(res);});
+}
+async function yandexSpeak(voice,text){
+  const p=new URLSearchParams();
+  p.set("text",text);p.set("lang","ru-RU");p.set("voice",voice);p.set("format","mp3");
+  const folder=$("yx-folder").value.trim();if(folder)p.set("folderId",folder);
+  const t0=performance.now();
+  const res=await fetch("https://tts.api.cloud.yandex.net/speech/v1/tts:synthesize",{
+    method:"POST",
+    headers:{"Authorization":"Api-Key "+$("yx-key").value.trim(),"Content-Type":"application/x-www-form-urlencoded"},
+    body:p.toString()
+  });
+  if(!res.ok)throw new Error("HTTP "+res.status+": "+(await res.text()).slice(0,180));
+  const blob=await res.blob();
+  if(!blob.size)throw new Error("пустой ответ");
+  return {url:URL.createObjectURL(blob),ms:Math.round(performance.now()-t0)};
+}
+async function yxAll(){
+  if(!$("yx-key").value.trim()){toast("Вставь Api-Key Яндекса",true);return;}
+  const text=$("tts-text").value.trim();if(!text){toast("Введи фразу сверху",true);return;}
+  yxAbort=false;$("yx-all").disabled=true;
+  const rows=[...$("yx-body").querySelectorAll("tr")].filter(r=>r.querySelector(".ck").checked);
+  for(const tr of rows){
+    if(yxAbort)break;
+    const voice=tr.querySelector(".cv").value.trim();
+    if(yxCache[voice]){tr.classList.remove("err");tr.classList.add("ok");tr.querySelector(".st").textContent="готово";tr.querySelector(".play").disabled=false;await playYX(yxCache[voice],tr);if(yxAbort)break;continue;}
+    tr.classList.remove("ok","err");tr.classList.add("run");tr.querySelector(".st").textContent="синтез…";
+    try{
+      const r=await yandexSpeak(voice,text);
+      yxCache[voice]=r.url;tr.dataset.ms=r.ms;
+      tr.classList.remove("run");tr.classList.add("ok");tr.querySelector(".st").textContent="готово";tr.querySelector(".ms").textContent=(r.ms/1000).toFixed(2)+" с";tr.querySelector(".play").disabled=false;
+      if(yxAbort)break;await playYX(r.url,tr);
+    }catch(e){
+      tr.classList.remove("run");tr.classList.add("err");tr.querySelector(".st").textContent="ошибка";
+      let m=e.message;if(/Failed to fetch|NetworkError|TypeError/i.test(m))m="CORS/сеть: Яндекс не пускает запрос из браузера — нужен прокси";
+      tr.querySelector(".note").innerHTML='<span class="err-txt">'+esc(m)+'</span>';
+    }
+  }
+  $("yx-all").disabled=false;
+  const best=rankFastest("yx-body");
+  if(!yxAbort)toast(best?"⚡ Быстрейший голос Yandex: "+best.model+" — "+best.s+" с":"Yandex готово");
+}
+
 /* ── события / инициализация ───────────────────────────── */
 $("eye").addEventListener("click",()=>{$("key").type=$("key").type==="password"?"text":"password";});
 $("key").addEventListener("input",()=>{try{localStorage.setItem("rtlab-key",$("key").value);}catch(e){}});
@@ -424,6 +521,10 @@ $("stt-on").addEventListener("click",()=>toggleAll("stt-body",true));
 $("stt-off").addEventListener("click",()=>toggleAll("stt-body",false));
 $("stt-all").addEventListener("click",sttAll);
 $("rec-btn").addEventListener("click",toggleRec);
+$("yx-all").addEventListener("click",yxAll);
+$("yx-stop").addEventListener("click",()=>{yxAbort=true;if(yxAudio){try{yxAudio.pause();}catch(e){}}document.querySelectorAll("#yx-body tr.play").forEach(r=>r.classList.remove("play"));toast("Стоп");});
+$("yx-key").addEventListener("input",()=>{try{localStorage.setItem("rtlab-yxkey",$("yx-key").value);}catch(e){}});
+$("yx-folder").addEventListener("input",()=>{try{localStorage.setItem("rtlab-yxfolder",$("yx-folder").value);}catch(e){}});
 function toggleAll(body,on){document.querySelectorAll("#"+body+" tr").forEach(tr=>{const ck=tr.querySelector(".ck");ck.checked=on;tr.classList.toggle("off",!on);});}
 
 /* префилл ключа: из лаборатории или из основного агента */
@@ -433,7 +534,8 @@ function toggleAll(body,on){document.querySelectorAll("#"+body+" tr").forEach(tr
   if(!k){try{const o=JSON.parse(localStorage.getItem("rtpult-or-v5")||"{}");if(o.key)k=o.key;}catch(e){}}
   if(k)$("key").value=k;
 })();
-buildTTS();buildSTT();updateRecUI();
+try{$("yx-key").value=localStorage.getItem("rtlab-yxkey")||"";$("yx-folder").value=localStorage.getItem("rtlab-yxfolder")||"";}catch(e){}
+buildTTS();buildSTT();buildYX();updateRecUI();
 </script>
 </body>
 </html>

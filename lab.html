@@ -430,6 +430,7 @@ function toggleAll(body,on){document.querySelectorAll("#"+body+" tr").forEach(tr
 (function initKey(){
   let k="";
   try{k=localStorage.getItem("rtlab-key")||"";}catch(e){}
+  if(!k){try{k=localStorage.getItem("rt_key")||"";}catch(e){}}
   if(!k){try{const o=JSON.parse(localStorage.getItem("rtpult-or-v5")||"{}");if(o.key)k=o.key;}catch(e){}}
   if(k)$("key").value=k;
 })();
